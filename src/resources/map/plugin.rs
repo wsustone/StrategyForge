@@ -5,7 +5,8 @@ use crate::components::unit::Team;
 use crate::components::terrain::StrategicPoint;
 // use crate::components::terrain::TerrainType; // Unused for now
 use crate::components::player::MechanicalBase;
-// use crate::components::player::PlayerResources; // Unused for now
+use crate::components::player::PlayerResources;
+use crate::components::ai::{AIControlled, AIBase, AIDifficulty};
 
 pub struct MapPlugin;
 
@@ -26,7 +27,7 @@ impl Plugin for MapPlugin {
 }
 
 // Setup the game map when entering gameplay state
-fn setup_map(
+pub fn setup_map(
     mut commands: Commands,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<ColorMaterial>>,
@@ -44,47 +45,78 @@ fn setup_map(
     // This would typically be a semi-transparent overlay covering unexplored areas
 }
 
-// Spawn the starting mechanical bases for players and AI
+// Spawn the starting mechanical bases for player and AI
 fn spawn_starting_bases(commands: &mut Commands, game_map: &GameMap) {
-    // Calculate starting positions - typically in the corners of the map
-    let positions = [
-        (5, 5),                                  // Bottom left (player)
-        (game_map.width - 5, game_map.height - 5), // Top right (enemy)
-        (5, game_map.height - 5),                // Top left (enemy)
-        (game_map.width - 5, 5),                // Bottom right (enemy)
-    ];
+    // Define base starting positions - opposite corners of the map
+    let player_position = (5, 5); // Bottom left (player)
+    let ai_position = (game_map.width - 5, game_map.height - 5); // Top right (AI)
     
-    // Spawn player and enemy mechanical bases
-    for (i, (grid_x, grid_y)) in positions.iter().enumerate() {
-        let world_pos = game_map.grid_to_world(*grid_x, *grid_y);
-        
-        let team = if i == 0 { Team::Player } else { Team::Enemy };
-        let color = if i == 0 { Color::srgb(0.2, 0.6, 0.8) } else { Color::srgb(0.8, 0.2, 0.2) };
-        
-        // Spawn the mechanical base entity
-        commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color,
-                    custom_size: Some(Vec2::new(game_map.tile_size * 2.0, game_map.tile_size * 2.0)),
-                    ..default()
-                },
-                transform: Transform::from_xyz(world_pos.x, world_pos.y, 10.0), // Above terrain
+    // Spawn player's mechanical base
+    let player_world_pos = game_map.grid_to_world(player_position.0, player_position.1);
+    let player_color = Color::srgb(0.2, 0.6, 0.8); // Blue color for player
+    
+    info!("Spawning player base at position: {:?}", player_world_pos);
+    
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: player_color,
+                custom_size: Some(Vec2::new(game_map.tile_size * 2.0, game_map.tile_size * 2.0)),
                 ..default()
             },
-            MechanicalBase {
-                health: 1000.0,
-                max_health: 1000.0,
-                movement_speed: 10.0, // Slow movement
-                team,
-                resources: vec![
-                    (crate::components::building::ResourceType::Wood, 200),
-                    (crate::components::building::ResourceType::Stone, 100),
-                    (crate::components::building::ResourceType::Iron, 50),
-                ],
+            transform: Transform::from_xyz(player_world_pos.x, player_world_pos.y, 10.0), // Above terrain
+            ..default()
+        },
+        MechanicalBase {
+            health: 1000.0,
+            max_health: 1000.0,
+            movement_speed: 10.0, // Slow movement
+            team: Team::Player,
+            resources: vec![
+                (crate::components::building::ResourceType::Wood, 200),
+                (crate::components::building::ResourceType::Stone, 100),
+                (crate::components::building::ResourceType::Iron, 50),
+            ],
+        },
+        Name::new("Player Base"),
+    ));
+    
+    // Initialize player resources
+    commands.insert_resource(PlayerResources::default());
+    
+    // Spawn AI's mechanical base
+    let ai_world_pos = game_map.grid_to_world(ai_position.0, ai_position.1);
+    let ai_color = Color::srgb(0.8, 0.2, 0.2); // Red color for AI
+    
+    info!("Spawning AI base at position: {:?}", ai_world_pos);
+    
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: ai_color,
+                custom_size: Some(Vec2::new(game_map.tile_size * 2.0, game_map.tile_size * 2.0)),
+                ..default()
             },
-        ));
-    }
+            transform: Transform::from_xyz(ai_world_pos.x, ai_world_pos.y, 10.0), // Above terrain
+            ..default()
+        },
+        MechanicalBase {
+            health: 1000.0,
+            max_health: 1000.0,
+            movement_speed: 10.0, // Slow movement
+            team: Team::Enemy,
+            resources: vec![
+                (crate::components::building::ResourceType::Wood, 200),
+                (crate::components::building::ResourceType::Stone, 100),
+                (crate::components::building::ResourceType::Iron, 50),
+            ],
+        },
+        AIControlled {
+            difficulty: AIDifficulty::Medium,
+        },
+        AIBase,
+        Name::new("AI Base"),
+    ));
 }
 
 // System to update control of strategic points

@@ -4,6 +4,8 @@ mod resources;
 mod entities;
 mod states;
 mod utils;
+mod ui;
+mod debug;
 
 use bevy::prelude::*;
 use states::loading::LoadingPlugin;
@@ -13,6 +15,13 @@ use states::game_over::GameOverPlugin;
 use systems::camera::CameraPlugin;
 // Import MapPlugin directly from its source location
 use crate::resources::map::plugin::MapPlugin;
+// Import our new MovementPlugin
+use crate::systems::movement::MovementPlugin;
+use crate::systems::base_movement::BaseMovePlugin;
+use crate::components::AIPlugin;
+use crate::ui::BaseActionUIPlugin;
+use crate::debug::DebugPlugin;
+use crate::components::strategic::StrategicLocationPlugin;
 // Temporarily commented out for debugging
 // use crate::utils::FontPlugin;
 // use crate::components::UnitLabelPlugin;
@@ -50,6 +59,12 @@ fn main() {
             GameOverPlugin,
             CameraPlugin,
             MapPlugin,
+            MovementPlugin,
+            BaseMovePlugin,
+            AIPlugin,
+            BaseActionUIPlugin,
+            DebugPlugin,
+            StrategicLocationPlugin,
             // Temporarily disable new plugins for debugging
             // FontPlugin,
             // UnitLabelPlugin,
