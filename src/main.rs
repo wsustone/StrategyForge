@@ -13,6 +13,9 @@ use states::game_over::GameOverPlugin;
 use systems::camera::CameraPlugin;
 // Import MapPlugin directly from its source location
 use crate::resources::map::plugin::MapPlugin;
+// Temporarily commented out for debugging
+// use crate::utils::FontPlugin;
+// use crate::components::UnitLabelPlugin;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum GameState {
@@ -47,6 +50,9 @@ fn main() {
             GameOverPlugin,
             CameraPlugin,
             MapPlugin,
+            // Temporarily disable new plugins for debugging
+            // FontPlugin,
+            // UnitLabelPlugin,
         ))
         
         // Run the game

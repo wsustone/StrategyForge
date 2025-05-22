@@ -1,0 +1,32 @@
+# Font Download Instructions
+
+This game uses the Fira Sans font family with multiple weights for different UI elements.
+
+## Option 1: Download the entire font family (recommended)
+
+1. Visit: https://fonts.google.com/specimen/Fira+Sans
+
+2. Click the "Download family" button in the top right
+
+3. Extract the downloaded zip file
+
+4. Copy the following font files to this directory (StrategyForge/assets/fonts/):
+   - FiraSans-Light.ttf
+   - FiraSans-Regular.ttf
+   - FiraSans-Medium.ttf
+   - FiraSans-SemiBold.ttf
+   - FiraSans-Bold.ttf
+
+## Option 2: Download individual files directly
+
+You can also download the individual font files directly from GitHub:
+
+- Light: https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Light.ttf
+- Regular: https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Regular.ttf
+- Medium: https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Medium.ttf
+- SemiBold: https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-SemiBold.ttf
+- Bold: https://github.com/mozilla/Fira/raw/master/ttf/FiraSans-Bold.ttf
+
+## Note
+
+If the font files are not found, the game will fall back to system fonts.
