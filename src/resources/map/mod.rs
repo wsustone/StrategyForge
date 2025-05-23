@@ -1,2 +1,2 @@
-// This file declares the plugin submodule to make it visible to Rust's module system
+// Map module for Strategy Forge
 pub mod plugin;

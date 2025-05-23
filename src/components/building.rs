@@ -28,7 +28,7 @@ pub struct Constructable {
     pub resource_cost: Vec<(ResourceType, i32)>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum ResourceType {
     Wood,
     Stone,

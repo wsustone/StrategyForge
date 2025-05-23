@@ -35,7 +35,7 @@ fn setup_game_over(
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                background_color: Color::srgb(0.1, 0.0, 0.0).into(),
+                background_color: BackgroundColor(Color::srgb(0.1, 0.0, 0.0)),
                 ..default()
             },
             GameOverUI,
@@ -47,7 +47,7 @@ fn setup_game_over(
                 TextStyle {
                     font: get_font_handle(&asset_server),
                     font_size: 100.0,
-                    color: Color::srgb(0.9, 0.1, 0.1),
+                    color: Color::srgba(0.9, 0.1, 0.1, 1.0),
                 },
             ));
             
@@ -57,7 +57,7 @@ fn setup_game_over(
                 TextStyle {
                     font: get_font_handle(&asset_server),
                     font_size: 36.0,
-                    color: Color::srgb(0.9, 0.6, 0.6),
+                    color: Color::srgba(0.9, 0.6, 0.6, 1.0),
                 },
             ));
             
@@ -72,7 +72,7 @@ fn setup_game_over(
                         justify_content: JustifyContent::Center,
                         ..default()
                     },
-                    background_color: Color::srgb(0.3, 0.1, 0.1).into(),
+                    background_color: BackgroundColor(Color::srgb(0.3, 0.1, 0.1)),
                     ..default()
                 })
                 .with_children(|parent| {
@@ -81,7 +81,7 @@ fn setup_game_over(
                         TextStyle {
                             font: get_font_handle(&asset_server),
                             font_size: 24.0,
-                            color: Color::srgb(0.9, 0.9, 0.9),
+                            color: Color::srgba(0.9, 0.9, 0.9, 1.0),
                         },
                     ));
                 });
@@ -103,10 +103,10 @@ fn handle_game_over_input(
                 next_state.set(GameState::MainMenu);
             }
             Interaction::Hovered => {
-                *background_color = Color::srgb(0.4, 0.2, 0.2).into();
+                *background_color = BackgroundColor(Color::srgba(0.4, 0.2, 0.2, 1.0));
             }
             Interaction::None => {
-                *background_color = Color::srgb(0.3, 0.1, 0.1).into();
+                *background_color = BackgroundColor(Color::srgba(0.3, 0.1, 0.1, 1.0));
             }
         }
     }

@@ -28,7 +28,7 @@ fn setup_loading(mut commands: Commands, asset_server: Res<AssetServer>) {
             justify_content: JustifyContent::Center,
             ..default()
         },
-        background_color: Color::srgb(0.1, 0.1, 0.1).into(),
+        background_color: BackgroundColor(Color::srgb(0.1, 0.1, 0.1)),
         ..default()
     }, LoadingUI)).with_children(|parent| {
         // Loading text

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::components::player::MechanicalBase;
 use crate::components::unit::{UnitState, Selected};
+use crate::resources::map::plugin::MapInitialized;
 use crate::GameState;
 
 /// Component for a target location the mechanical base should move to
@@ -15,6 +16,10 @@ pub struct BaseMovePlugin;
 impl Plugin for BaseMovePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
+            OnEnter(GameState::Gameplay),
+            initialize_base_move_components
+        )
+        .add_systems(
             Update,
             (
                 handle_base_movement,
@@ -23,6 +28,28 @@ impl Plugin for BaseMovePlugin {
         );
         
         info!("Base Movement Plugin initialized");
+    }
+}
+
+/// System to initialize movement components for all bases when entering gameplay state
+fn initialize_base_move_components(
+    mut commands: Commands,
+    bases: Query<(Entity, Option<&UnitState>), With<MechanicalBase>>,
+    map_initialized: Res<MapInitialized>,
+) {
+    if map_initialized.0 {
+        info!("Initializing base movement components");
+        
+        // Set all bases to Idle state if they don't already have a state
+        for (base_entity, maybe_state) in bases.iter() {
+            // Remove any existing move targets to start fresh
+            commands.entity(base_entity).remove::<MoveTarget>();
+            
+            // Ensure all bases have an idle state
+            if maybe_state.is_none() {
+                commands.entity(base_entity).insert(UnitState::Idle);
+            }
+        }
     }
 }
 

@@ -65,9 +65,9 @@ impl BuildingType {
         
         // Adjust color based on team
         let _team_color = match team {
-            Team::Player => Color::srgb(0.2, 0.6, 0.8),
-            Team::Enemy => Color::srgb(0.8, 0.2, 0.2),
-            Team::Neutral => Color::srgb(0.7, 0.7, 0.7),
+            Team::Player => Color::srgba(0.2, 0.6, 0.8, 1.0),
+            Team::Enemy => Color::srgba(0.8, 0.2, 0.2, 1.0),
+            Team::Neutral => Color::srgba(0.7, 0.7, 0.7, 1.0),
         };
         
         // Combine building type color with team color
@@ -76,13 +76,13 @@ impl BuildingType {
         let final_color = if team == Team::Player {
             // Adjust player building colors based on type
             match self {
-                BuildingType::CommandCenter => Color::srgb(0.3, 0.6, 0.9),
-                _ => Color::srgb(0.2, 0.6, 0.8) // Blue for player buildings
+                BuildingType::CommandCenter => Color::srgba(0.3, 0.6, 0.9, 1.0),
+                _ => Color::srgba(0.2, 0.6, 0.8, 1.0) // Blue for player buildings
             }
         } else if team == Team::Enemy {
-            Color::srgb(0.8, 0.2, 0.2) // Red for enemy buildings
+            Color::srgba(0.8, 0.2, 0.2, 1.0) // Red for enemy buildings
         } else {
-            Color::srgb(0.7, 0.7, 0.7) // Gray for neutral buildings
+            Color::srgba(0.7, 0.7, 0.7, 1.0) // Gray for neutral buildings
         };
         
         // Create components based on building type

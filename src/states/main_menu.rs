@@ -42,7 +42,7 @@ fn setup_main_menu(
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                background_color: Color::srgb(0.1, 0.1, 0.3).into(),
+                background_color: BackgroundColor(Color::srgb(0.1, 0.1, 0.3)),
                 ..default()
             },
             MainMenuUI,
@@ -54,7 +54,7 @@ fn setup_main_menu(
                 TextStyle {
                     font: get_font_handle(&asset_server),
                     font_size: 80.0,
-                    color: Color::srgb(0.9, 0.9, 0.9),
+                    color: Color::srgba(0.9, 0.9, 0.9, 1.0),
                 },
             ));
             
@@ -100,7 +100,7 @@ fn spawn_button(
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                background_color: Color::srgb(0.15, 0.15, 0.35).into(),
+                background_color: BackgroundColor(Color::srgb(0.15, 0.15, 0.35)),
                 ..default()
             },
             button_type,
@@ -111,7 +111,7 @@ fn spawn_button(
                 TextStyle {
                     font: get_font_handle(asset_server),
                     font_size: 30.0,
-                    color: Color::srgb(0.9, 0.9, 0.9),
+                    color: Color::srgba(0.9, 0.9, 0.9, 1.0),
                 },
             ));
         });
@@ -143,10 +143,10 @@ fn handle_menu_buttons(
                 }
             }
             Interaction::Hovered => {
-                *background_color = Color::srgb(0.25, 0.25, 0.45).into();
+                *background_color = BackgroundColor(Color::srgb(0.25, 0.25, 0.45));
             }
             Interaction::None => {
-                *background_color = Color::srgb(0.15, 0.15, 0.35).into();
+                *background_color = BackgroundColor(Color::srgb(0.15, 0.15, 0.35));
             }
         }
     }

@@ -17,21 +17,21 @@ impl ResourceNodeType {
                 ResourceType::Wood, 
                 1000, 
                 3, 
-                Color::srgb(0.0, 0.5, 0.0), 
+                Color::srgba(0.0, 0.5, 0.0, 1.0), 
                 Vec2::new(24.0, 24.0)
             ),
             ResourceNodeType::StoneDeposit => (
                 ResourceType::Stone, 
                 800, 
                 2, 
-                Color::srgb(0.5, 0.5, 0.5), 
+                Color::srgba(0.5, 0.5, 0.5, 1.0), 
                 Vec2::new(24.0, 24.0)
             ),
             ResourceNodeType::IronDeposit => (
                 ResourceType::Iron, 
                 600, 
                 2, 
-                Color::srgb(0.6, 0.6, 0.7), 
+                Color::srgba(0.6, 0.6, 0.7, 1.0), 
                 Vec2::new(24.0, 24.0)
             ),
         };

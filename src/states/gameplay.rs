@@ -2,7 +2,9 @@ use bevy::prelude::*;
 use crate::GameState;
 use crate::utils::font_loader::get_font_handle;
 use crate::components::unit::{Unit, Team};
-use crate::components::player::MechanicalBase;
+use crate::entities::unit_types::UnitType;
+use crate::components::player::{MechanicalBase, PlayerResources};
+use crate::sprites::GameSprites;
 
 pub struct GameplayPlugin;
 
@@ -51,7 +53,10 @@ struct SelectionBox {
 
 fn setup_gameplay(
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
     asset_server: Res<AssetServer>,
+    game_sprites: Res<GameSprites>,
 ) {
     // Game camera (we'll use the one from the CameraPlugin)
     
@@ -61,6 +66,9 @@ fn setup_gameplay(
         wood: 300,
         stone: 200,
     });
+    
+    // Initialize player resources for production and economy
+    commands.insert_resource(PlayerResources::default());
     
     commands.insert_resource(SelectionBox {
         start: None,
@@ -94,7 +102,7 @@ fn setup_gameplay(
                     column_gap: Val::Px(20.0),
                     ..default()
                 },
-                background_color: Color::srgba(0.0, 0.0, 0.0, 0.7).into(),
+                background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
                 ..default()
             })
             .with_children(|parent| {
@@ -104,7 +112,7 @@ fn setup_gameplay(
                     TextStyle {
                         font: get_font_handle(&asset_server),
                         font_size: 20.0,
-                        color: Color::srgb(1.0, 0.9, 0.0),
+                        color: Color::srgba(1.0, 0.9, 0.0, 1.0),
                     },
                 ));
                 
@@ -114,7 +122,7 @@ fn setup_gameplay(
                     TextStyle {
                         font: get_font_handle(&asset_server),
                         font_size: 20.0,
-                        color: Color::srgb(0.6, 0.4, 0.2),
+                        color: Color::srgba(0.6, 0.4, 0.2, 1.0),
                     },
                 ));
                 
@@ -124,7 +132,7 @@ fn setup_gameplay(
                     TextStyle {
                         font: get_font_handle(&asset_server),
                         font_size: 20.0,
-                        color: Color::srgb(0.7, 0.7, 0.7),
+                        color: Color::srgba(0.7, 0.7, 0.7, 1.0),
                     },
                 ));
             });
@@ -139,13 +147,16 @@ fn setup_gameplay(
                     right: Val::Px(10.0),
                     ..default()
                 },
-                background_color: Color::srgba(0.1, 0.1, 0.1, 0.8).into(),
+                background_color: BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
                 ..default()
             });
         });
     
-    // Spawn a few example units
-    spawn_example_units(&mut commands);
+    // Spawn example units with proper sprites
+    spawn_example_units(&mut commands, &game_sprites);
+    
+    // Spawn mechanical bases with proper sprites
+    spawn_mechanical_bases(&mut commands, &game_sprites);
 }
 
 fn handle_input(
@@ -158,61 +169,208 @@ fn handle_input(
     }
 }
 
-fn spawn_example_units(commands: &mut Commands) {
-    // Spawn some example units for testing purposes
-    // These will be replaced with actual unit spawning systems in the future
-
+fn spawn_example_units(commands: &mut Commands, game_sprites: &Res<GameSprites>) {
+    // Spawn specific unit types that will use our sprites
+    // 2 tanks and 2 artillery units for each team
+    
     // Spawn player's units
-    for i in 0..5 {
-        commands.spawn((
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::srgb(0.2, 0.2, 0.8), // Blue
-                    custom_size: Some(Vec2::new(20.0, 20.0)),
-                    ..default()
-                },
-                transform: Transform::from_xyz(-200.0 + i as f32 * 50.0, -200.0, 5.0),
-                ..default()
-            },
-            Unit {
-                health: 100.0,
-                max_health: 100.0,
-                movement_speed: 100.0,
-                team: Team::Player,
-                attack_power: 10.0,
-                attack_range: 50.0,
-            },
-            // Add unit state as a separate component
-            crate::components::unit::UnitState::Idle,
-            Name::new(format!("Player Unit {}", i)),
-        ));
+    // Player tanks
+    for i in 0..2 {
+        let unit_type = UnitType::LandToLandTank;
+        let position = Vec2::new(-200.0 + i as f32 * 50.0, -150.0);
+        
+        // Get the tank sprite from the GameSprites resource
+        let sprite_handle = if game_sprites.is_loaded {
+            game_sprites.get_unit_sprite("tank_player", 0).cloned()
+        } else {
+            None
+        };
+        
+        // Spawn the tank
+        let tank_entity = unit_type.spawn_unit(commands, position, Team::Player);
+        
+        // If we have a sprite, attach it to the entity
+        if let Some(texture) = sprite_handle {
+            commands.entity(tank_entity).insert(texture);
+        }
+        
+        commands.entity(tank_entity).insert(Name::new(format!("Player Tank {}", i)));
     }
-
+    
+    // Player artillery
+    for i in 0..2 {
+        let unit_type = UnitType::Artillery;
+        let position = Vec2::new(-200.0 + i as f32 * 50.0, -200.0);
+        
+        // Get the artillery sprite from the GameSprites resource
+        let sprite_handle = if game_sprites.is_loaded {
+            game_sprites.get_unit_sprite("artillery_player", 0).cloned()
+        } else {
+            None
+        };
+        
+        // Spawn the artillery
+        let artillery_entity = unit_type.spawn_unit(commands, position, Team::Player);
+        
+        // If we have a sprite, attach it to the entity
+        if let Some(texture) = sprite_handle {
+            commands.entity(artillery_entity).insert(texture);
+        }
+        
+        commands.entity(artillery_entity).insert(Name::new(format!("Player Artillery {}", i)));
+    }
+    
     // Spawn enemy units
-    for i in 0..5 {
-        commands.spawn((
+    // Enemy tanks
+    for i in 0..2 {
+        let unit_type = UnitType::LandToLandTank;
+        let position = Vec2::new(200.0 - i as f32 * 50.0, 150.0);
+        
+        // Get the tank sprite from the GameSprites resource - use direction 4 (facing left)
+        let sprite_handle = if game_sprites.is_loaded {
+            game_sprites.get_unit_sprite("tank_enemy", 4).cloned()
+        } else {
+            None
+        };
+        
+        // Spawn the tank
+        let tank_entity = unit_type.spawn_unit(commands, position, Team::Enemy);
+        
+        // If we have a sprite, attach it to the entity
+        if let Some(texture) = sprite_handle {
+            commands.entity(tank_entity).insert(texture);
+        }
+        
+        commands.entity(tank_entity).insert(Name::new(format!("Enemy Tank {}", i)));
+    }
+    
+    // Enemy artillery
+    for i in 0..2 {
+        let unit_type = UnitType::Artillery;
+        let position = Vec2::new(200.0 - i as f32 * 50.0, 200.0);
+        
+        // Get the artillery sprite from the GameSprites resource - use direction 4 (facing left)
+        let sprite_handle = if game_sprites.is_loaded {
+            game_sprites.get_unit_sprite("artillery_enemy", 4).cloned()
+        } else {
+            None
+        };
+        
+        // Spawn the artillery
+        let artillery_entity = unit_type.spawn_unit(commands, position, Team::Enemy);
+        
+        // If we have a sprite, attach it to the entity
+        if let Some(texture) = sprite_handle {
+            commands.entity(artillery_entity).insert(texture);
+        }
+        
+        commands.entity(artillery_entity).insert(Name::new(format!("Enemy Artillery {}", i)));
+    }
+    
+    info!("Spawned tanks and artillery units");
+}
+
+// Function to spawn mechanical bases
+fn spawn_mechanical_bases(commands: &mut Commands, game_sprites: &Res<GameSprites>) {
+    // Spawn player's mechanical base with sprite
+    let player_base_sprite = if game_sprites.is_loaded {
+        // Use direction 0 (facing right)
+        game_sprites.get_base_sprite("base_player", 0).cloned()
+    } else {
+        None
+    };
+    
+    commands.spawn((
+        if let Some(texture) = player_base_sprite {
+            // Use the base sprite
             SpriteBundle {
+                texture,
                 sprite: Sprite {
-                    color: Color::srgb(0.8, 0.2, 0.2), // Red
-                    custom_size: Some(Vec2::new(20.0, 20.0)),
+                    // Still apply a slight blue tint to indicate player team
+                    color: Color::srgba(0.9, 0.9, 1.0, 1.0),
+                    // Size will be determined by the sprite
                     ..default()
                 },
-                transform: Transform::from_xyz(200.0 - i as f32 * 50.0, 200.0, 5.0),
+                transform: Transform::from_xyz(-250.0, -250.0, 1.0) // Low z value to ensure visibility
+                    .with_scale(Vec3::new(0.25, 0.25, 1.0)), // Scale down to 25% size
                 ..default()
-            },
-            Unit {
-                health: 100.0,
-                max_health: 100.0,
-                movement_speed: 100.0,
-                team: Team::Enemy,
-                attack_power: 10.0,
-                attack_range: 50.0,
-            },
-            // Add unit state as a separate component
-            crate::components::unit::UnitState::Idle,
-            Name::new(format!("Enemy Unit {}", i)),
-        ));
-    }
+            }
+        } else {
+            // Fallback to colored square if sprite not loaded
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::srgba(0.2, 0.6, 0.8, 1.0), // Blue for player
+                    custom_size: Some(Vec2::new(40.0, 40.0)), // Larger size for the base
+                    ..default()
+                },
+                transform: Transform::from_xyz(-250.0, -250.0, 1.0),
+                ..default()
+            }
+        },
+        MechanicalBase {
+            health: 1000.0,
+            max_health: 1000.0,
+            movement_speed: 50.0,
+            team: Team::Player,
+            resources: vec![
+                (crate::components::building::ResourceType::Wood, 100),
+                (crate::components::building::ResourceType::Stone, 50),
+                (crate::components::building::ResourceType::Iron, 25),
+            ],
+        },
+        Name::new("Player Base"),
+    ));
+    
+    // Spawn enemy's mechanical base with sprite
+    let enemy_base_sprite = if game_sprites.is_loaded {
+        // Use direction 4 (facing left) for enemy base
+        game_sprites.get_base_sprite("base_enemy", 4).cloned()
+    } else {
+        None
+    };
+    
+    commands.spawn((
+        if let Some(texture) = enemy_base_sprite {
+            // Use the base sprite
+            SpriteBundle {
+                texture,
+                sprite: Sprite {
+                    // Apply a red tint to indicate enemy team
+                    color: Color::srgba(1.0, 0.8, 0.8, 1.0),
+                    // Size will be determined by the sprite
+                    ..default()
+                },
+                transform: Transform::from_xyz(250.0, 250.0, 1.0) // Low z value to ensure visibility
+                    .with_scale(Vec3::new(0.25, 0.25, 1.0)), // Scale down to 25% size
+                ..default()
+            }
+        } else {
+            // Fallback to colored square if sprite not loaded
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::srgba(0.8, 0.2, 0.2, 1.0), // Red for enemy
+                    custom_size: Some(Vec2::new(40.0, 40.0)), // Larger size for the base
+                    ..default()
+                },
+                transform: Transform::from_xyz(250.0, 250.0, 1.0),
+                ..default()
+            }
+        },
+        MechanicalBase {
+            health: 1000.0,
+            max_health: 1000.0,
+            movement_speed: 50.0,
+            team: Team::Enemy,
+            resources: vec![
+                (crate::components::building::ResourceType::Wood, 100),
+                (crate::components::building::ResourceType::Stone, 50),
+                (crate::components::building::ResourceType::Iron, 25),
+            ],
+        },
+        Name::new("Enemy Base"),
+    ));
+    
+    info!("Mechanical bases spawned");
 }
 
 fn unit_selection(
@@ -256,15 +414,16 @@ fn unit_selection(
                     
                     info!("Base at position: {:?}, distance from click: {}", base_pos, distance);
                     
-                    // Use an extremely generous radius-based collision detection
-                    // Making this very large to ensure bases are easy to select
-                    let selection_radius = 128.0; // Super generous radius for much easier selection
+                    // Use a reasonable radius-based collision detection
+                    // Base size is 40x40, so we'll use half that plus a bit extra
+                    let selection_radius = 25.0; // More reasonable radius for base selection
                     
                     if distance < selection_radius {
                         // Select this base
                         commands.entity(entity).insert(Selected);
+                        info!("Selected base at {:?}", base_pos);
                         
-                        // Early return - don't check anything else
+                        // Early return - don't try to select other bases
                         return;
                     }
                 }
@@ -290,25 +449,92 @@ fn unit_selection(
             let min_y = start.y.min(end.y);
             let max_y = start.y.max(end.y);
             
-            // Select player units within the box
-            for (entity, transform, _, unit) in units.iter_mut() {
-                if unit.team == Team::Player {
-                    let pos = transform.translation;
-                    if pos.x >= min_x && pos.x <= max_x && pos.y >= min_y && pos.y <= max_y {
+            // Check if the selection box is large enough to be a deliberate selection
+            // If it's too small, it might be just a click with minimal movement
+            let box_width = max_x - min_x;
+            let box_height = max_y - min_y;
+            let min_selection_size = 5.0; // Minimum size for box selection to activate
+            
+            if box_width > min_selection_size && box_height > min_selection_size {
+                info!("Selection box: ({}, {}) to ({}, {})", min_x, min_y, max_x, max_y);
+                
+                // Select player units within the box
+                for (entity, transform, _, unit) in units.iter_mut() {
+                    if unit.team == Team::Player {
+                        let pos = transform.translation;
+                        if pos.x >= min_x && pos.x <= max_x && pos.y >= min_y && pos.y <= max_y {
+                            commands.entity(entity).insert(Selected);
+                            info!("Selected unit at ({}, {})", pos.x, pos.y);
+                        }
+                    }
+                }
+            } else {
+                // It was just a click, try to select a single unit or base
+                let click_pos = Vec2::new((min_x + max_x) / 2.0, (min_y + max_y) / 2.0);
+                info!("Treating as single click at ({}, {})", click_pos.x, click_pos.y);
+                
+                // Try to select a unit first
+                let mut closest_unit = None;
+                let mut closest_distance = f32::MAX;
+                let selection_radius = 15.0; // Radius for single unit selection
+                
+                // First pass: check for units
+                for (entity, transform, _, unit) in units.iter_mut() {
+                    if unit.team == Team::Player {
+                        let pos = transform.translation.truncate();
+                        let distance = click_pos.distance(pos);
+                        
+                        if distance < selection_radius && distance < closest_distance {
+                            closest_unit = Some(entity);
+                            closest_distance = distance;
+                        }
+                    }
+                }
+                
+                // If we found a unit to select, select it
+                if let Some(entity) = closest_unit {
+                    commands.entity(entity).insert(Selected);
+                    info!("Selected closest unit at distance {}", closest_distance);
+                } else {
+                    // If no unit was found, try to select a base
+                    let mut closest_base = None;
+                    closest_distance = f32::MAX; // Reset for base selection
+                    let base_selection_radius = 25.0;
+                    
+                    for (entity, transform, _, base) in bases.iter_mut() {
+                        if base.team == Team::Player {
+                            let pos = transform.translation.truncate();
+                            let distance = click_pos.distance(pos);
+                            
+                            if distance < base_selection_radius && distance < closest_distance {
+                                closest_base = Some(entity);
+                                closest_distance = distance;
+                            }
+                        }
+                    }
+                    
+                    // Select only the closest base
+                    if let Some(entity) = closest_base {
                         commands.entity(entity).insert(Selected);
+                        info!("Selected closest base at distance {}", closest_distance);
                     }
                 }
             }
             
-            // Select player bases within the box
-            for (entity, transform, _, base) in bases.iter_mut() {
-                if base.team == Team::Player {
-                    let pos = transform.translation;
-                    if pos.x >= min_x && pos.x <= max_x && pos.y >= min_y && pos.y <= max_y {
-                        commands.entity(entity).insert(Selected);
+            // If we're doing box selection, also check for bases
+            if box_width > min_selection_size && box_height > min_selection_size {
+                // Select player bases within the box
+                for (entity, transform, _, base) in bases.iter_mut() {
+                    if base.team == Team::Player {
+                        let pos = transform.translation;
+                        if pos.x >= min_x && pos.x <= max_x && pos.y >= min_y && pos.y <= max_y {
+                            commands.entity(entity).insert(Selected);
+                            info!("Selected base at ({}, {})", pos.x, pos.y);
+                        }
                     }
                 }
             }
+            // Note: The single-click base selection is now handled in the unit selection 'else' block above
             
             // Reset selection box
             selection_box.start = None;
@@ -348,7 +574,7 @@ fn update_selection_box_visual(
             commands.spawn((
                 SpriteBundle {
                     sprite: Sprite {
-                        color: Color::srgba(0.2, 0.6, 1.0, 0.3), // Semi-transparent blue
+                        color: Color::srgba(0.2, 0.6, 1.0, 0.3),
                         custom_size: Some(Vec2::new(width, height)),
                         ..default()
                     },
@@ -390,7 +616,7 @@ fn spawn_selection_box_border(
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
-                color: Color::srgb(0.2, 0.6, 1.0), // Solid blue
+                color: Color::srgba(0.2, 0.6, 1.0, 1.0),
                 custom_size: Some(Vec2::new(width, height)),
                 ..default()
             },
@@ -417,19 +643,19 @@ fn update_selection_visuals(
         
         if entity_selected {
             // If this entity is selected, make it bright blue
-            sprite.color = Color::srgb(0.4, 0.8, 1.0);
+            sprite.color = Color::srgba(0.4, 0.8, 1.0, 1.0);
         } else {
             // Otherwise, use default color based on team
             if let Some(base) = base {
                 match base.team {
-                    Team::Player => sprite.color = Color::srgb(0.2, 0.6, 0.8), // Blue for player
-                    Team::Enemy => sprite.color = Color::srgb(0.8, 0.2, 0.2),  // Red for enemy
+                    Team::Player => sprite.color = Color::srgba(0.2, 0.6, 0.8, 1.0), // Blue for player
+                    Team::Enemy => sprite.color = Color::srgba(0.8, 0.2, 0.2, 1.0),  // Red for enemy
                     _ => {}
                 }
             } else if let Some(unit) = unit {
                 match unit.team {
-                    Team::Player => sprite.color = Color::srgb(0.2, 0.2, 0.8), // Darker blue for player units
-                    Team::Enemy => sprite.color = Color::srgb(0.8, 0.2, 0.2),  // Red for enemy units
+                    Team::Player => sprite.color = Color::srgba(0.2, 0.2, 0.8, 1.0), // Darker blue for player units
+                    Team::Enemy => sprite.color = Color::srgba(0.8, 0.2, 0.2, 1.0),  // Red for enemy units
                     _ => {}
                 }
             }

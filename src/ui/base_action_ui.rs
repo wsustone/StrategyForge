@@ -76,8 +76,8 @@ fn spawn_base_action_ui(commands: &mut Commands, asset_server: &Res<AssetServer>
                     ..default()
                 },
                 // Use standard colors
-                background_color: Color::srgba(0.1, 0.1, 0.1, 0.8).into(),
-                border_color: Color::srgb(0.3, 0.3, 0.3).into(),
+                background_color: BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
+                border_color: BorderColor(Color::srgb(0.3, 0.3, 0.3)),
                 ..default()
             },
             BaseActionUI,
@@ -116,7 +116,7 @@ fn create_action_button(
                     flex_direction: FlexDirection::Column,
                     ..default()
                 },
-                background_color: Color::srgb(0.2, 0.2, 0.2).into(),
+                background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
                 ..default()
             },
             action.clone(),
@@ -130,7 +130,7 @@ fn create_action_button(
                     TextStyle {
                         font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                         font_size: 16.0,
-                        color: Color::srgb(0.95, 0.95, 0.95),
+                        color: Color::srgba(0.95, 0.95, 0.95, 1.0),
                     },
                 ).with_style(Style {
                     align_self: AlignSelf::Center,
@@ -152,7 +152,7 @@ fn handle_button_interactions(
         match *interaction {
             Interaction::Pressed => {
                 // Change button color when pressed
-                *color = Color::srgb(0.35, 0.75, 0.35).into(); // Green for pressed
+                *color = BackgroundColor(Color::srgb(0.35, 0.75, 0.35)); // Green for pressed
                 info!("Action {:?} selected", action);
                 
                 // Handle the different actions
@@ -188,11 +188,11 @@ fn handle_button_interactions(
             }
             Interaction::Hovered => {
                 // Change button color when hovered
-                *color = Color::srgb(0.33, 0.33, 0.33).into();
+                *color = BackgroundColor(Color::srgb(0.33, 0.33, 0.33));
             }
             Interaction::None => {
                 // Reset button color when not interacting
-                *color = Color::srgb(0.2, 0.2, 0.2).into();
+                *color = BackgroundColor(Color::srgb(0.2, 0.2, 0.2));
             }
         }
     }

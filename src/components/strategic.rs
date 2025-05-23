@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::components::unit::Team;
 use crate::components::player::MechanicalBase;
 use crate::resources::map_data::GameMap;
+use crate::resources::map::plugin::MapInitialized;
 use crate::GameState;
 use rand::Rng;
 
@@ -49,11 +50,20 @@ impl Plugin for StrategicLocationPlugin {
     }
 }
 
-/// Spawns strategic locations on the map
+/// System to spawn strategic locations on the map
 fn spawn_strategic_locations(
     mut commands: Commands,
     game_map: Res<GameMap>,
+    map_initialized: Res<MapInitialized>,
 ) {
+    // Only spawn strategic locations if the map is already initialized
+    // This prevents duplicate spawning when returning to gameplay
+    if map_initialized.0 {
+        info!("Spawning strategic locations");
+    } else {
+        info!("Map not yet initialized, skipping strategic location spawning");
+        return;
+    }
     // Define the number of strategic locations based on the number of players
     // For now we hardcode 2 players, so 1 strategic location (2/2 = 1)
     let num_locations = 1;
@@ -80,7 +90,7 @@ fn spawn_strategic_locations(
         let _location = commands.spawn((
             SpriteBundle {
                 sprite: Sprite {
-                    color: Color::srgb(0.9, 0.7, 0.1), // Gold color
+                    color: Color::srgba(0.9, 0.7, 0.1, 1.0), // Gold color
                     custom_size: Some(Vec2::new(game_map.tile_size * 3.0, game_map.tile_size * 3.0)),
                     ..default()
                 },
@@ -99,7 +109,7 @@ fn spawn_strategic_locations(
         commands.spawn((
             SpriteBundle {
                 sprite: Sprite {
-                    color: Color::srgb(1.0, 0.9, 0.3), // Brighter gold for the marker
+                    color: Color::srgba(1.0, 0.9, 0.3, 1.0), // Brighter gold for the marker
                     custom_size: Some(Vec2::new(game_map.tile_size * 1.5, game_map.tile_size * 1.5)),
                     ..default()
                 },
@@ -189,14 +199,14 @@ fn update_strategic_location_visuals(
         // Update the strategic location sprite based on control status
         if let Some(team) = location.controlling_team {
             match team {
-                Team::Player => sprite.color = Color::srgb(0.2, 0.6, 0.8), // Blue for player control
-                Team::Enemy => sprite.color = Color::srgb(0.8, 0.2, 0.2),  // Red for enemy control
-                _ => sprite.color = Color::srgb(0.9, 0.7, 0.1),           // Default gold
+                Team::Player => sprite.color = Color::srgba(0.2, 0.6, 0.8, 1.0), // Blue for player control
+                Team::Enemy => sprite.color = Color::srgba(0.8, 0.2, 0.2, 1.0),  // Red for enemy control
+                _ => sprite.color = Color::srgba(0.9, 0.7, 0.1, 1.0),           // Default gold
             }
         } else {
             // No controlling team, use default color with alpha based on control points
             // We're not using control_percent for now, just keeping the default color
-            sprite.color = Color::srgb(0.9, 0.7, 0.1);
+            sprite.color = Color::srgba(0.9, 0.7, 0.1, 1.0);
         }
     }
 }
