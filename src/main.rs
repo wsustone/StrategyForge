@@ -22,6 +22,11 @@ use crate::components::AIPlugin;
 use crate::ui::BaseActionUIPlugin;
 use crate::debug::DebugPlugin;
 use crate::components::strategic::StrategicLocationPlugin;
+// Import the sprite loader and sprite handling systems
+use crate::resources::SpriteLoaderPlugin;
+use crate::components::IsometricSpritePlugin;
+// Import the mobile base plugin
+use crate::entities::MobileBasePlugin;
 // Temporarily commented out for debugging
 // use crate::utils::FontPlugin;
 // use crate::components::UnitLabelPlugin;
@@ -65,6 +70,9 @@ fn main() {
             BaseActionUIPlugin,
             DebugPlugin,
             StrategicLocationPlugin,
+            SpriteLoaderPlugin,
+            IsometricSpritePlugin,
+            MobileBasePlugin,
             // Temporarily disable new plugins for debugging
             // FontPlugin,
             // UnitLabelPlugin,
