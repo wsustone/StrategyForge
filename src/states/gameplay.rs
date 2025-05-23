@@ -3,6 +3,7 @@ use crate::GameState;
 use crate::utils::font_loader::get_font_handle;
 use crate::components::unit::{Unit, Team};
 use crate::entities::unit_types::UnitType;
+use crate::components::base_modules::ResourceType;
 use crate::components::player::{MechanicalBase, PlayerResources};
 use crate::sprites::GameSprites;
 
@@ -310,13 +311,19 @@ fn spawn_mechanical_bases(commands: &mut Commands, game_sprites: &Res<GameSprite
         MechanicalBase {
             health: 1000.0,
             max_health: 1000.0,
-            movement_speed: 50.0,
+            base_movement_speed: 50.0,
+            effective_movement_speed: 50.0,
             team: Team::Player,
             resources: vec![
-                (crate::components::building::ResourceType::Wood, 100),
-                (crate::components::building::ResourceType::Stone, 50),
-                (crate::components::building::ResourceType::Iron, 25),
+                (ResourceType::Wood, 100),
+                (ResourceType::Stone, 50),
+                (ResourceType::Iron, 25),
             ],
+            power_output: 100.0,
+            power_consumed: 0.0,
+            max_power: 150.0,
+            attachment_points: Vec::new(),
+            modules: Vec::new(),
         },
         Name::new("Player Base"),
     ));
@@ -359,13 +366,19 @@ fn spawn_mechanical_bases(commands: &mut Commands, game_sprites: &Res<GameSprite
         MechanicalBase {
             health: 1000.0,
             max_health: 1000.0,
-            movement_speed: 50.0,
+            base_movement_speed: 50.0,
+            effective_movement_speed: 50.0,
             team: Team::Enemy,
             resources: vec![
-                (crate::components::building::ResourceType::Wood, 100),
-                (crate::components::building::ResourceType::Stone, 50),
-                (crate::components::building::ResourceType::Iron, 25),
+                (ResourceType::Wood, 100),
+                (ResourceType::Stone, 50),
+                (ResourceType::Iron, 25),
             ],
+            power_output: 100.0,
+            power_consumed: 0.0,
+            max_power: 150.0,
+            attachment_points: Vec::new(),
+            modules: Vec::new(),
         },
         Name::new("Enemy Base"),
     ));
@@ -714,3 +727,4 @@ fn cleanup_gameplay(
     commands.remove_resource::<GameResources>();
     commands.remove_resource::<SelectionBox>();
 }
+

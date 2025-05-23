@@ -26,7 +26,10 @@ pub enum UnitState {
     Building,
 }
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+use bevy::reflect::Reflect;
+
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[reflect(Component)]
 pub enum Team {
     Player,
     Enemy,

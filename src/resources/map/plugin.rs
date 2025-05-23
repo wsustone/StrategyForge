@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::resources::map_data::{GameMap, generate_map};
+use crate::resources::map_data::generate_map;
 
 // A marker resource to indicate the map has been initialized
 #[derive(Resource)]

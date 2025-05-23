@@ -7,86 +7,108 @@ from mathutils import Vector
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete()
 
-# Path configuration - use a specific output directory with proper permissions
+# Path configuration
 output_dir = r"C:\Users\Juston\Documents\blender"
 if not os.path.exists(output_dir):
     try:
         os.makedirs(output_dir)
     except PermissionError:
         print(f"Permission error creating directory: {output_dir}")
-        # Fallback to temp directory
         import tempfile
         output_dir = os.path.join(tempfile.gettempdir(), "strategy_forge_sprites")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         print(f"Using temporary directory for sprites: {output_dir}")
 
-def create_simple_unit(unit_type, size=1.0, color=(0.8, 0.2, 0.2, 1.0)):
-    """Create a simple unit using basic shapes"""
+def create_simple_building(building_type, size=1.0):
+    """Create a simple building using basic shapes"""
     bpy.ops.object.select_all(action='DESELECT')
     
-    if unit_type == 'fighter':
-        # Simple cone pointing forward
-        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.5*size, depth=1.5*size)
-        unit = bpy.context.active_object
-        unit.rotation_euler = (math.radians(90), 0, 0)  # Point along X-axis
-        unit.scale = (1, 1, 0.5)  # Flatten slightly
+    if building_type == 'command_center':
+        # Main building - larger with antenna
+        bpy.ops.mesh.primitive_cube_add(size=size)
+        main = bpy.context.active_object
+        main.scale = (2.0, 2.0, 1.0)
+        
+        # Add antenna
+        bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.1, depth=1.0)
+        antenna = bpy.context.active_object
+        antenna.location = (0, 0, 1.5)
+        
+        # Add dome
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.8, location=(0, 0, 1.0))
+        dome = bpy.context.active_object
+        dome.scale = (1, 1, 0.6)
+        
         color = (0.8, 0.2, 0.2, 1.0)  # Red
         
-    elif unit_type == 'bomber':
-        # Simple box shape
+    elif building_type == 'barracks':
+        # Barracks - long rectangular building
         bpy.ops.mesh.primitive_cube_add(size=size)
-        unit = bpy.context.active_object
-        unit.scale = (1.5, 2.0, 0.5)
+        main = bpy.context.active_object
+        main.scale = (2.5, 1.5, 0.8)
+        
+        # Add roof
+        bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=1.5, radius2=1.5, depth=2.5)
+        roof = bpy.context.active_object
+        roof.location.z = 0.8
+        roof.rotation_euler = (0, 0, math.radians(45))
+        
         color = (0.2, 0.2, 0.8, 1.0)  # Blue
         
-    elif unit_type == 'large_aircraft':
-        # Simple cylinder for large aircraft
-        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=size, depth=2*size)
-        unit = bpy.context.active_object
-        unit.scale = (1, 1, 0.3)  # Flatten
-        color = (0.2, 0.8, 0.2, 1.0)  # Green
+    elif building_type == 'factory':
+        # Factory - large industrial building
+        bpy.ops.mesh.primitive_cube_add(size=size)
+        main = bpy.context.active_object
+        main.scale = (2.0, 3.0, 1.2)
+        
+        # Add smokestack
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.3, depth=1.5)
+        stack = bpy.context.active_object
+        stack.location = (1.0, 0, 1.6)
+        
+        # Add roof
+        bpy.ops.mesh.primitive_cube_add(size=1.0)
+        roof = bpy.context.active_object
+        roof.scale = (2.2, 3.2, 0.1)
+        roof.location.z = 1.7
+        
+        color = (0.4, 0.4, 0.4, 1.0)  # Gray
+        
+    elif building_type == 'power_plant':
+        # Power plant - circular with cooling towers
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=1.5, depth=1.0)
+        main = bpy.context.active_object
+        
+        # Add cooling towers
+        for x in [-1, 1]:
+            bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.5, depth=1.5)
+            tower = bpy.context.active_object
+            tower.location = (x * 0.8, 0, 1.0)
+        
+        color = (0.8, 0.8, 0.2, 1.0)  # Yellow
     
-    # Set material
-    mat = bpy.data.materials.new(name=f"{unit_type}_material")
-    mat.diffuse_color = color
-    if unit.data.materials:
-        unit.data.materials[0] = mat
-    else:
-        unit.data.materials.append(mat)
+    # Set material for all objects
+    for obj in bpy.context.selected_objects:
+        mat = bpy.data.materials.new(name=f"{building_type}_material")
+        mat.diffuse_color = color
+        if obj.data.materials:
+            obj.data.materials[0] = mat
+        else:
+            obj.data.materials.append(mat)
     
-    # Add an arrow to show forward direction
-    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.1, depth=0.5)
-    arrow = bpy.context.active_object
-    arrow.location = (0.7 * size, 0, 0)  # Position at front
-    arrow.rotation_euler = (0, math.radians(90), 0)
-    
-    # Make arrow a child of unit
-    arrow.parent = unit
-    
-    # Set arrow material (slightly brighter)
-    arrow_mat = bpy.data.materials.new(name=f"{unit_type}_arrow_material")
-    arrow_mat.diffuse_color = tuple(min(c + 0.3, 1.0) for c in color[:3]) + (1.0,)
-    if arrow.data.materials:
-        arrow.data.materials[0] = arrow_mat
-    else:
-        arrow.data.materials.append(arrow_mat)
-    
-    # Select both objects and join them
+    # Select all parts and join them
     bpy.ops.object.select_all(action='DESELECT')
-    unit.select_set(True)
-    arrow.select_set(True)
-    bpy.context.view_layer.objects.active = unit
+    for obj in bpy.data.objects:
+        if obj.type == 'MESH':
+            obj.select_set(True)
+    bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
     bpy.ops.object.join()
     
-    # Name the unit
-    unit.name = f"{unit_type.capitalize()}"
+    # Name the building
+    bpy.context.active_object.name = f"{building_type.replace('_', ' ').title()}"
     
-    return unit
-
-
-
-
+    return bpy.context.active_object
 
 def setup_isometric_camera():
     """Set up an isometric camera"""
@@ -99,11 +121,11 @@ def setup_isometric_camera():
     camera = bpy.context.active_object
     camera.name = 'IsometricCamera'
     
-    # Set isometric angle (matching the artillery generator)
+    # Set isometric angle
     camera.rotation_euler = (math.radians(54.736), 0, math.radians(45))
     
-    # Position the camera (matching the artillery generator)
-    camera.location = (8, -8, 8)
+    # Position the camera
+    camera.location = (12, -12, 12)  # Slightly higher for buildings
     
     # Set as active camera
     bpy.context.scene.camera = camera
@@ -152,8 +174,6 @@ def setup_fast_render():
     # Anti-aliasing
     bpy.context.scene.eevee.taa_render_samples = 16
     bpy.context.scene.eevee.taa_samples = 8
-    
-    # Bloom not available in this Blender version
 
 def render_8_angles(obj, output_dir):
     """Render an object from 8 angles (45° increments)"""
@@ -185,27 +205,28 @@ def render_8_angles(obj, output_dir):
         print(f"Rendered: {output_path}")
 
 def main():
-    """Main function to generate all air units"""
+    """Main function to generate all base buildings"""
     # Setup scene
     setup_isometric_camera()
     setup_simple_lighting()
     setup_fast_render()
     
-    # Unit types and their relative sizes
-    unit_types = [
-        ('fighter', 1.0),
-        ('bomber', 1.5),
-        ('large_aircraft', 2.0)
+    # Building types and their relative sizes
+    building_types = [
+        'command_center',
+        'barracks',
+        'factory',
+        'power_plant'
     ]
     
-    for unit_type, size in unit_types:
+    for building_type in building_types:
         # Clear scene for new model
         bpy.ops.object.select_all(action='SELECT')
         bpy.ops.object.delete()
         
-        # Create and render the unit
-        unit = create_simple_unit(unit_type, size)
-        render_8_angles(unit, os.path.join(output_dir, unit_type))
+        # Create and render the building
+        building = create_simple_building(building_type)
+        render_8_angles(building, os.path.join(output_dir, building_type))
 
 if __name__ == "__main__":
     main()

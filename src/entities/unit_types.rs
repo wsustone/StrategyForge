@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use crate::components::unit::{Unit, Team, UnitState};
-use crate::sprites::GameSprites;
 
 /// Defines the different types of units available in the game
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]

@@ -108,7 +108,7 @@ fn handle_base_movement(
             let direction = (target_position - current_position).normalize_or_zero();
             
             // Calculate movement distance this frame
-            let movement_speed = base.movement_speed;
+            let movement_speed = base.effective_movement_speed;
             let movement_distance = movement_speed * time.delta_seconds();
             
             // Calculate new position

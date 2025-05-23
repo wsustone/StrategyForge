@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use crate::components::building::{Building, BuildingSpawner, ResourceType};
+use crate::components::building::{Building, BuildingSpawner};
+use crate::components::base_modules::ResourceType;
 use crate::components::player::PlayerResources;
 use crate::components::unit::Team;
 // Import the necessary components

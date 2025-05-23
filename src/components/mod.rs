@@ -6,6 +6,7 @@ pub mod terrain;
 pub mod player;
 pub mod ai;
 pub mod strategic;
+pub mod base_modules;
 
 // Export plugins
 // Temporarily commented out for debugging

@@ -7,14 +7,13 @@ from mathutils import Vector
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete()
 
-# Path configuration - use a specific output directory with proper permissions
+# Path configuration
 output_dir = r"C:\Users\Juston\Documents\blender"
 if not os.path.exists(output_dir):
     try:
         os.makedirs(output_dir)
     except PermissionError:
         print(f"Permission error creating directory: {output_dir}")
-        # Fallback to temp directory
         import tempfile
         output_dir = os.path.join(tempfile.gettempdir(), "strategy_forge_sprites")
         if not os.path.exists(output_dir):
@@ -22,47 +21,79 @@ if not os.path.exists(output_dir):
         print(f"Using temporary directory for sprites: {output_dir}")
 
 def create_simple_unit(unit_type, size=1.0, color=(0.8, 0.2, 0.2, 1.0)):
-    """Create a simple unit using basic shapes"""
+    """Create a simple ground unit using basic shapes"""
     bpy.ops.object.select_all(action='DESELECT')
     
-    if unit_type == 'fighter':
-        # Simple cone pointing forward
-        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.5*size, depth=1.5*size)
-        unit = bpy.context.active_object
-        unit.rotation_euler = (math.radians(90), 0, 0)  # Point along X-axis
-        unit.scale = (1, 1, 0.5)  # Flatten slightly
-        color = (0.8, 0.2, 0.2, 1.0)  # Red
-        
-    elif unit_type == 'bomber':
-        # Simple box shape
+    if unit_type == 'tank':
+        # Simple tank shape (box with cylinder turret)
         bpy.ops.mesh.primitive_cube_add(size=size)
-        unit = bpy.context.active_object
-        unit.scale = (1.5, 2.0, 0.5)
-        color = (0.2, 0.2, 0.8, 1.0)  # Blue
+        body = bpy.context.active_object
+        body.scale = (1.5, 2.0, 0.6)
+        body.location.z = 0.3
         
-    elif unit_type == 'large_aircraft':
-        # Simple cylinder for large aircraft
-        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=size, depth=2*size)
-        unit = bpy.context.active_object
-        unit.scale = (1, 1, 0.3)  # Flatten
-        color = (0.2, 0.8, 0.2, 1.0)  # Green
+        # Turret
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.6, depth=0.4)
+        turret = bpy.context.active_object
+        turret.location = (0, 0, 0.7)
+        
+        # Gun barrel
+        bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.1, depth=1.2)
+        barrel = bpy.context.active_object
+        barrel.location = (0, 0.8, 0.7)
+        barrel.rotation_euler = (math.radians(90), 0, 0)
+        
+        color = (0.6, 0.6, 0.2, 1.0)  # Olive drab
+        
+    elif unit_type == 'artillery':
+        # Simple artillery shape (box with long barrel)
+        bpy.ops.mesh.primitive_cube_add(size=size)
+        body = bpy.context.active_object
+        body.scale = (1.5, 1.5, 0.5)
+        
+        # Barrel
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.2, depth=2.0)
+        barrel = bpy.context.active_object
+        barrel.location = (0, 0.8, 0.3)
+        barrel.rotation_euler = (math.radians(15), 0, 0)
+        
+        color = (0.4, 0.4, 0.4, 1.0)  # Gray
+        
+    elif unit_type == 'harvester':
+        # Simple harvester shape (box with scoop)
+        bpy.ops.mesh.primitive_cube_add(size=size)
+        body = bpy.context.active_object
+        body.scale = (1.2, 1.8, 0.8)
+        
+        # Scoop
+        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.8, radius2=0.1, depth=1.0)
+        scoop = bpy.context.active_object
+        scoop.location = (0, -1.2, 0.2)
+        scoop.rotation_euler = (math.radians(90), 0, 0)
+        
+        color = (0.8, 0.5, 0.1, 1.0)  # Orange
     
-    # Set material
-    mat = bpy.data.materials.new(name=f"{unit_type}_material")
-    mat.diffuse_color = color
-    if unit.data.materials:
-        unit.data.materials[0] = mat
-    else:
-        unit.data.materials.append(mat)
+    # Set material for all objects
+    for obj in bpy.context.selected_objects:
+        mat = bpy.data.materials.new(name=f"{unit_type}_material")
+        mat.diffuse_color = color
+        if obj.data.materials:
+            obj.data.materials[0] = mat
+        else:
+            obj.data.materials.append(mat)
     
-    # Add an arrow to show forward direction
-    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.1, depth=0.5)
+    # Select all parts and join them
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in bpy.data.objects:
+        if obj.type == 'MESH':
+            obj.select_set(True)
+    bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
+    bpy.ops.object.join()
+    
+    # Add forward arrow
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.2, depth=0.5)
     arrow = bpy.context.active_object
-    arrow.location = (0.7 * size, 0, 0)  # Position at front
-    arrow.rotation_euler = (0, math.radians(90), 0)
-    
-    # Make arrow a child of unit
-    arrow.parent = unit
+    arrow.location = (0, 1.2 * size, 0.4)
+    arrow.rotation_euler = (0, math.radians(-90), 0)
     
     # Set arrow material (slightly brighter)
     arrow_mat = bpy.data.materials.new(name=f"{unit_type}_arrow_material")
@@ -72,21 +103,18 @@ def create_simple_unit(unit_type, size=1.0, color=(0.8, 0.2, 0.2, 1.0)):
     else:
         arrow.data.materials.append(arrow_mat)
     
-    # Select both objects and join them
+    # Join arrow with unit
     bpy.ops.object.select_all(action='DESELECT')
-    unit.select_set(True)
-    arrow.select_set(True)
-    bpy.context.view_layer.objects.active = unit
+    for obj in bpy.data.objects:
+        if obj.type == 'MESH':
+            obj.select_set(True)
+    bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
     bpy.ops.object.join()
     
     # Name the unit
-    unit.name = f"{unit_type.capitalize()}"
+    bpy.context.active_object.name = f"{unit_type.capitalize()}"
     
-    return unit
-
-
-
-
+    return bpy.context.active_object
 
 def setup_isometric_camera():
     """Set up an isometric camera"""
@@ -152,8 +180,6 @@ def setup_fast_render():
     # Anti-aliasing
     bpy.context.scene.eevee.taa_render_samples = 16
     bpy.context.scene.eevee.taa_samples = 8
-    
-    # Bloom not available in this Blender version
 
 def render_8_angles(obj, output_dir):
     """Render an object from 8 angles (45° increments)"""
@@ -185,7 +211,7 @@ def render_8_angles(obj, output_dir):
         print(f"Rendered: {output_path}")
 
 def main():
-    """Main function to generate all air units"""
+    """Main function to generate all ground units"""
     # Setup scene
     setup_isometric_camera()
     setup_simple_lighting()
@@ -193,9 +219,9 @@ def main():
     
     # Unit types and their relative sizes
     unit_types = [
-        ('fighter', 1.0),
-        ('bomber', 1.5),
-        ('large_aircraft', 2.0)
+        ('tank', 1.0),
+        ('artillery', 1.2),
+        ('harvester', 1.1)
     ]
     
     for unit_type, size in unit_types:

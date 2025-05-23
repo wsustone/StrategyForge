@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::components::building::ResourceType;
+use crate::components::base_modules::ResourceType;
 use crate::components::player::PlayerResources;
 use crate::components::unit::Team;
 use crate::entities::building_types::BuildingType;
@@ -434,6 +434,7 @@ fn place_building(
                             ResourceType::Wood => wood_available = *amount,
                             ResourceType::Stone => stone_available = *amount,
                             ResourceType::Iron => iron_available = *amount,
+                            _ => {} // Ignore other resource types for now
                         }
                     }
                     
@@ -445,6 +446,7 @@ fn place_building(
                                 ResourceType::Wood => *amount -= wood_cost,
                                 ResourceType::Stone => *amount -= stone_cost,
                                 ResourceType::Iron => *amount -= iron_cost,
+                                _ => {} // Ignore other resource types for now
                             }
                         }
                         
