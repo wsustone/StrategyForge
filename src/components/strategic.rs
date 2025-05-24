@@ -3,7 +3,7 @@ use crate::components::unit::Team;
 use crate::components::player::MechanicalBase;
 use crate::resources::map_data::GameMap;
 use crate::resources::map::plugin::MapInitialized;
-use crate::GameState;
+use crate::states::game_state::GameState;
 use rand::Rng;
 
 /// Component representing a strategic location target

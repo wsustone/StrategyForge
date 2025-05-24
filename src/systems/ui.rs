@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::player::PlayerResources;
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 // UI systems plugin
 pub struct UIPlugin;

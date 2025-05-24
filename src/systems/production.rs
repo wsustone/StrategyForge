@@ -2,12 +2,11 @@ use bevy::prelude::*;
 use crate::components::building::{Building, BuildingSpawner};
 use crate::components::base_modules::ResourceType;
 use crate::components::player::PlayerResources;
-use crate::components::unit::Team;
-// Import the necessary components
+use crate::components::unit::{Team, Unit, UnitState};
+use crate::components::unit_types::UnitType;
 use crate::components::resource::Gatherer;
-use crate::entities::unit_types::UnitType;
+use crate::states::game_state::GameState;
 use crate::units::engineer::Engineer;
-use crate::components::unit::{Unit, UnitState};
 use std::time::Duration;
 
 pub struct ProductionPlugin;
@@ -16,7 +15,7 @@ impl Plugin for ProductionPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (handle_unit_production,).run_if(in_state(crate::GameState::Gameplay))
+            (handle_unit_production,).run_if(in_state(GameState::Gameplay))
         );
         
         info!("Production Plugin initialized");
@@ -87,8 +86,8 @@ fn handle_unit_production(
                     };
                     
                     if can_afford {
-                        // Spawn the engineer directly here
-                        let _engineer_entity = spawn_local_engineer(&mut commands, spawn_pos, *team);
+                        let engineer = spawn_local_engineer(&mut commands, spawn_pos, *team);
+                        commands.entity(engineer).insert(UnitType::Engineer);
                         info!("Spawned Engineer unit for team {:?}", team);
                     } else {
                         info!("Not enough resources to spawn Engineer");
@@ -133,6 +132,10 @@ fn spawn_local_engineer(commands: &mut Commands, position: Vec2, team: Team) -> 
             team,
             attack_power: 5.0,
             attack_range: 1.0,
+            state: UnitState::Idle,
+            attack_cooldown: Timer::from_seconds(1.0, TimerMode::Once),
+            attack_target: None,
+            movement_target: None,
         },
         UnitType::Engineer,
         Engineer {

@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::GameState;
+use crate::states::game_state::GameState;
 use crate::utils::font_loader::get_font_handle;
 
 pub struct GameOverPlugin;

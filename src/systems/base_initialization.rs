@@ -5,7 +5,7 @@ use crate::components::base_modules::{
     ModuleType,
     ResourceType,
 };
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 /// System to initialize attachment points on the mechanical base
 pub fn initialize_base_attachments(

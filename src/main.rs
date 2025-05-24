@@ -51,6 +51,12 @@ use crate::resources::{
 
 // Other plugins
 use crate::debug::DebugPlugin;
+use crate::entities::*;
+use crate::resources::*;
+use crate::states::*;
+use crate::systems::*;
+use crate::ui::*;
+use crate::ui::menu::MenuPlugin;
 use crate::units::EngineerPlugin;
 use crate::sprites::SpriteLoaderPlugin;
 
@@ -63,14 +69,7 @@ use crate::components::{
 // use crate::utils::FontPlugin;
 // use crate::components::UnitLabelPlugin;
 
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
-enum GameState {
-    #[default]
-    Loading,
-    MainMenu,
-    Gameplay,
-    GameOver,
-}
+// Using GameState from the states module
 
 fn main() {
     App::new()
@@ -86,7 +85,7 @@ fn main() {
             },
         ))
         // Add game state management
-        .init_state::<GameState>()
+        .init_state::<states::game_state::GameState>()
         
         // Add our custom plugins individually
         // Game state management
@@ -117,6 +116,7 @@ fn main() {
         .add_plugins(BaseActionUIPlugin)
         .add_plugins(BuildingProductionUIPlugin)
         .add_plugins(BuildingSelectionUIPlugin)
+        .add_plugins(MenuPlugin)
         
         // Debug and utility
         .add_plugins(DebugPlugin)

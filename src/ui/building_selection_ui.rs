@@ -3,7 +3,7 @@ use crate::components::base_modules::ResourceType;
 use crate::components::player::PlayerResources;
 use crate::components::unit::Team;
 use crate::entities::building_types::BuildingType;
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 // Component to mark UI elements as part of the building selection UI
 #[derive(Component)]

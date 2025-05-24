@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::time::TimerMode;
 use crate::components::unit::{Unit, Team, UnitState};
 
 /// Defines the different types of units available in the game
@@ -57,8 +56,6 @@ impl UnitType {
         };
         
         // Combine unit type color with team color
-        // For Bevy 0.14.0, let's use a simpler approach that just mixes the team color with the unit color
-        // We'll just create a slightly different color based on the unit type and team
         let final_color = if team == Team::Player {
             Color::srgba(0.2, 0.6, 0.8, 1.0) // Blue for player units
         } else if team == Team::Enemy {
@@ -82,7 +79,6 @@ impl UnitType {
                     texture: sprite_handle,
                     sprite: Sprite {
                         color: final_color, // Apply team color tint
-                        // No custom size needed - the sprite will use its natural size
                         ..default()
                     },
                     transform: Transform::from_xyz(position.x, position.y, 1.0), // Lower z-value to ensure visibility
@@ -111,8 +107,7 @@ impl UnitType {
                 attack_cooldown: Timer::from_seconds(1.0, TimerMode::Once),
                 attack_target: None,
                 movement_target: None,
-            })
-            .insert(*self);
+            });
             
         entity
     }

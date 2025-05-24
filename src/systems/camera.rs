@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::input::mouse::MouseWheel;
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 pub struct CameraPlugin;
 

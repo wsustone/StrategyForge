@@ -1,0 +1,12 @@
+[package]
+name = "strategy_forge_tests"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "strategy_forge_tests"
+path = "module_tests.rs"
+
+[dependencies]
+strategy_forge = { path = ".." }
+bevy = { version = "0.14.0", default-features = false, features = ["bevy_asset", "bevy_ecs", "bevy_app", "bevy_reflect", "bevy_time"] }

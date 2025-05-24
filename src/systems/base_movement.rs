@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use crate::components::player::MechanicalBase;
 use crate::components::unit::{UnitState, Selected};
 use crate::resources::map::plugin::MapInitialized;
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 /// Component for a target location the mechanical base should move to
 #[derive(Component)]

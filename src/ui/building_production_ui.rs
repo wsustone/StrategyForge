@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use crate::components::building::{Building, BuildingSpawner};
 use crate::components::unit::{Selected, Team};
 use crate::entities::building_types::BuildingType;
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 // Component to mark UI elements as part of the building production UI
 #[derive(Component)]

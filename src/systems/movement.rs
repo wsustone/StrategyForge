@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-
-use crate::GameState;
+use crate::states::game_state::GameState;
 use crate::components::unit::{Unit, UnitState, Selected};
 
 // Simple component to mark a unit's destination

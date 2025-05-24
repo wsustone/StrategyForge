@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::components::player::MechanicalBase;
 use crate::components::unit::{Selected, Team, UnitState};
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 // Component to mark UI elements as part of the base action UI
 #[derive(Component)]

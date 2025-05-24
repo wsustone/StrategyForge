@@ -1,11 +1,13 @@
 use bevy::prelude::*;
-use crate::GameState;
+use crate::states::game_state::GameState;
 use crate::utils::font_loader::get_font_handle;
 use crate::components::unit::{Unit, Team};
-use crate::entities::unit_types::UnitType;
+use crate::components::unit_types::UnitType;
 use crate::components::base_modules::ResourceType;
 use crate::components::player::{MechanicalBase, PlayerResources};
 use crate::sprites::GameSprites;
+
+// TODO: Move UnitType to components/unit.rs or create a proper unit_types module
 
 pub struct GameplayPlugin;
 
@@ -41,9 +43,9 @@ struct Selected;
 // Resources
 #[derive(Resource)]
 struct GameResources {
-    gold: i32,
-    wood: i32,
-    stone: i32,
+    _gold: i32,
+    _wood: i32,
+    _stone: i32,
 }
 
 #[derive(Resource)]
@@ -54,8 +56,8 @@ struct SelectionBox {
 
 fn setup_gameplay(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut _meshes: ResMut<Assets<Mesh>>,
+    mut _materials: ResMut<Assets<ColorMaterial>>,
     asset_server: Res<AssetServer>,
     game_sprites: Res<GameSprites>,
 ) {
@@ -63,9 +65,9 @@ fn setup_gameplay(
     
     // Initialize game resources
     commands.insert_resource(GameResources {
-        gold: 500,
-        wood: 300,
-        stone: 200,
+        _gold: 500,
+        _wood: 300,
+        _stone: 200,
     });
     
     // Initialize player resources for production and economy

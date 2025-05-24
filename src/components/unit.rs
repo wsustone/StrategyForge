@@ -1,6 +1,8 @@
 use bevy::prelude::*;
+use bevy::ecs::entity::Entity;
 
 // Unit components for our RTS game
+
 #[derive(Component)]
 pub struct Unit {
     pub health: f32,
@@ -9,6 +11,10 @@ pub struct Unit {
     pub attack_range: f32,
     pub movement_speed: f32,
     pub team: Team,
+    pub state: UnitState,
+    pub attack_cooldown: Timer,
+    pub attack_target: Option<Entity>,
+    pub movement_target: Option<Vec2>,
 }
 
 #[derive(Component)]

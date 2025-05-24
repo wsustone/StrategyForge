@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use bevy::ecs::system::ParamSet;
 use crate::components::unit::{Unit, Team, UnitState};
+use crate::components::unit_types::UnitType;
 use crate::components::resource::{Gatherer, ResourceNode};
 use crate::components::building::{Building, ResourceType, Constructable};
-use crate::entities::unit_types::UnitType;
 use std::time::Duration;
 
 // Plugin for Engineer unit functionality
@@ -19,7 +19,7 @@ impl Plugin for EngineerPlugin {
                 (
                     handle_engineer_selection,
                     handle_engineer_resource_gathering,
-                ).run_if(in_state(crate::GameState::Gameplay))
+                ).run_if(in_state(crate::states::game_state::GameState::Gameplay))
             );
             
         // Temporarily remove handle_engineer_building from systems until fully fixed
@@ -319,6 +319,10 @@ pub fn spawn_engineer(commands: &mut Commands, position: Vec2, team: Team) -> En
             team,
             attack_power: 5.0,
             attack_range: 1.0,
+            state: UnitState::Idle,
+            attack_cooldown: Timer::from_seconds(1.0, TimerMode::Once),
+            attack_target: None,
+            movement_target: None,
         },
         UnitType::Engineer,
         Engineer {

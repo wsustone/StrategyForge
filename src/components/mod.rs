@@ -1,5 +1,6 @@
 pub mod unit;
 pub mod unit_label;
+pub mod unit_types;
 pub mod building;
 pub mod resource;
 pub mod terrain;
