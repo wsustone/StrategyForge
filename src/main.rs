@@ -109,7 +109,8 @@ fn main() {
         
         // Unit systems
         .add_plugins(EngineerPlugin)
-        .add_plugins(MobileBasePlugin)
+        // Temporarily disabled to prevent spawning steampunk bases on blank map
+        // .add_plugins(MobileBasePlugin)
         
         // UI systems
         .add_plugins(BaseActionUIPlugin)

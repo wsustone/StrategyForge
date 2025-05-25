@@ -31,8 +31,11 @@ impl Plugin for EngineerPlugin {
 // Component to mark a unit as an Engineer
 #[derive(Component)]
 pub struct Engineer {
+    #[allow(dead_code)]
     pub build_speed: f32,
+    #[allow(dead_code)]
     pub build_timer: Timer,
+    #[allow(dead_code)]
     pub target_building: Option<Entity>,
 }
 

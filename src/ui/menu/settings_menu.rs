@@ -1,4 +1,11 @@
 use bevy::prelude::*;
+use bevy::input::keyboard::{KeyCode, KeyboardInput};
+use bevy::input::mouse::{MouseButton, MouseScrollUnit, MouseWheel};
+use bevy::input::ButtonInput;
+use bevy::input::ButtonState;
+use bevy::window::PrimaryWindow;
+use bevy::ecs::query::With;
+use bevy::ecs::system::Query;
 use super::components::{MenuUI, create_button, create_title};
 
 /// Plugin for the settings menu
@@ -6,10 +13,22 @@ pub struct SettingsMenuPlugin;
 
 impl Plugin for SettingsMenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<OpenSettingsEvent>()
+        // Initialize GameSettings with default values
+        app.init_resource::<GameSettings>()
+           .add_event::<OpenSettingsEvent>()
            .add_event::<CloseSettingsEvent>()
            .add_systems(Update, handle_open_settings_event)
-           .add_systems(Update, handle_settings_buttons.run_if(resource_exists::<SettingsMenuState>))
+           .add_systems(
+               Update,
+               (
+                   handle_settings_buttons,
+                   handle_scrolling,
+                   handle_slider_interaction,
+                   handle_key_binding,
+                   handle_checkbox_interaction,
+               )
+               .run_if(|res: Option<Res<SettingsMenuState>>| res.is_some())
+           )
            .add_systems(Update, handle_close_settings_event);
     }
 }
@@ -22,10 +41,149 @@ pub struct OpenSettingsEvent;
 #[derive(Event)]
 pub struct CloseSettingsEvent;
 
+/// Game settings that persist between sessions
+#[derive(Resource, Clone, Debug)]
+pub struct GameSettings {
+    // Video settings
+    #[allow(dead_code)]
+    pub resolution: (u32, u32),
+    #[allow(dead_code)]
+    pub graphics_quality: GraphicsQuality,
+    pub fullscreen: bool,
+    pub vsync: bool,
+    pub ui_scale: f32,
+    
+    // Audio settings
+    pub master_volume: f32,
+    pub music_volume: f32,
+    pub sfx_volume: f32,
+    pub voice_volume: f32,
+    pub ambient_volume: f32,
+    pub show_audio_indicators: bool,
+    
+    // Controls settings
+    pub mouse_sensitivity: f32,
+    pub invert_y_axis: bool,
+    pub key_bindings: KeyBindings,
+    
+    // Gameplay settings
+    pub game_speed: f32,
+    #[allow(dead_code)]
+    pub difficulty: Difficulty,
+    pub show_tutorials: bool,
+    pub auto_save: bool,
+    #[allow(dead_code)]
+    pub auto_save_interval: u32,
+    
+    // Interface settings
+    pub show_health_bars: bool,
+    pub show_damage_numbers: bool,
+    pub minimap_size: f32,
+    pub hud_opacity: f32,
+}
+
+impl Default for GameSettings {
+    fn default() -> Self {
+        Self {
+            // Default video settings
+            resolution: (1920, 1080),
+            graphics_quality: GraphicsQuality::High,
+            fullscreen: false,
+            vsync: true,
+            ui_scale: 1.0,
+            
+            // Default audio settings
+            master_volume: 1.0,
+            music_volume: 0.8,
+            sfx_volume: 0.9,
+            voice_volume: 1.0,
+            ambient_volume: 0.7,
+            show_audio_indicators: true,
+            
+            // Default controls settings
+            mouse_sensitivity: 0.5,
+            invert_y_axis: false,
+            key_bindings: KeyBindings::default(),
+            
+            // Default gameplay settings
+            game_speed: 1.0,
+            difficulty: Difficulty::Normal,
+            show_tutorials: true,
+            auto_save: true,
+            auto_save_interval: 5, // minutes
+            
+            // Default interface settings
+            show_health_bars: true,
+            show_damage_numbers: true,
+            minimap_size: 0.8,
+            hud_opacity: 0.9,
+        }
+    }
+}
+
+/// Graphics quality presets
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GraphicsQuality {
+    #[allow(dead_code)]
+    Low,
+    #[allow(dead_code)]
+    Medium,
+    #[allow(dead_code)]
+    High,
+    #[allow(dead_code)]
+    Ultra,
+}
+
+/// Difficulty levels
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Difficulty {
+    #[allow(dead_code)]
+    Easy,
+    #[allow(dead_code)]
+    Normal,
+    #[allow(dead_code)]
+    Hard,
+    #[allow(dead_code)]
+    Veteran,
+}
+
+/// Key bindings for game actions
+#[derive(Clone, Debug)]
+pub struct KeyBindings {
+    pub move_up: KeyCode,
+    pub move_down: KeyCode,
+    pub move_left: KeyCode,
+    pub move_right: KeyCode,
+    pub select: KeyCode,
+    pub cancel: KeyCode,
+    pub pause: KeyCode,
+    pub quick_save: KeyCode,
+    pub quick_load: KeyCode,
+}
+
+impl Default for KeyBindings {
+    fn default() -> Self {
+        Self {
+            move_up: KeyCode::KeyW,
+            move_down: KeyCode::KeyS,
+            move_left: KeyCode::KeyA,
+            move_right: KeyCode::KeyD,
+            select: KeyCode::Space,
+            cancel: KeyCode::Escape,
+            pause: KeyCode::KeyP,
+            quick_save: KeyCode::F5,
+            quick_load: KeyCode::F9,
+        }
+    }
+}
+
 /// State of the settings menu
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 struct SettingsMenuState {
     active_tab: SettingsTab,
+    scroll_offset: f32, // Track scrolling position
+    content_height: f32, // Total content height
+    temp_settings: GameSettings, // Temporary settings that get applied when clicking Apply
 }
 
 /// Tabs in the settings menu
@@ -41,6 +199,18 @@ enum SettingsTab {
 /// Marker component for settings menu UI elements
 #[derive(Component)]
 struct SettingsMenuUI;
+
+/// Marker for the content area that can be scrolled
+#[derive(Component)]
+struct ContentArea;
+
+/// Marker for the viewport area that shows visible content
+#[derive(Component)]
+struct ViewportArea;
+
+/// Marker for the scrollbar handle
+#[derive(Component)]
+struct ScrollbarHandle;
 
 /// Settings menu button types
 #[derive(Component)]
@@ -58,13 +228,21 @@ enum SettingsButton {
 /// Slider component for settings
 #[derive(Component)]
 struct SettingsSlider {
-    setting_type: SliderType,
     min: f32,
     max: f32,
-    current: f32,
+    value: f32,
+    slider_type: SliderType,
+    dragging: bool,
+    #[allow(dead_code)]
+    track_entity: Entity,
+    fill_entity: Entity,
+    handle_entity: Entity,
+    value_text_entity: Entity,
 }
 
 /// Types of sliders in the settings menu
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
 enum SliderType {
     MasterVolume,
     MusicVolume,
@@ -74,6 +252,51 @@ enum SliderType {
     MouseSensitivity,
     GameSpeed,
     UiScale,
+    MinimapSize,
+    HudOpacity,
+    TextDuration,
+}
+
+/// Component to mark a checkbox
+#[derive(Component)]
+struct SettingsCheckbox {
+    checked: bool,
+    checkbox_type: CheckboxType,
+}
+
+/// Types of checkboxes in the settings menu
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
+enum CheckboxType {
+    Fullscreen,
+    VSync,
+    InvertYAxis,
+    ShowTutorials,
+    AutoSave,
+    ShowHealthBars,
+    ShowDamageNumbers,
+    ShowAudioIndicators,
+}
+
+/// Component to mark a key binding element
+#[derive(Component)]
+struct KeyBindingElement {
+    binding_type: KeyBindingType,
+    listening: bool,
+}
+
+/// Types of key bindings in the settings menu
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum KeyBindingType {
+    MoveUp,
+    MoveDown,
+    MoveLeft,
+    MoveRight,
+    Select,
+    Cancel,
+    Pause,
+    QuickSave,
+    QuickLoad,
 }
 
 /// Handle the open settings event
@@ -82,16 +305,78 @@ fn handle_open_settings_event(
     mut ev_open_settings: EventReader<OpenSettingsEvent>,
     asset_server: Res<AssetServer>,
     settings_state: Option<Res<SettingsMenuState>>,
+    game_settings: Res<GameSettings>,
 ) {
     for _ in ev_open_settings.read() {
         // Only open settings if it's not already open
         if settings_state.is_none() {
-            commands.insert_resource(SettingsMenuState {
+            let settings_state = SettingsMenuState {
                 active_tab: SettingsTab::Video,
-            });
+                scroll_offset: 0.0,
+                content_height: 1000.0, // Default height, will be updated during rendering
+                temp_settings: game_settings.clone(),
+            };
             
-            spawn_settings_menu(&mut commands, &asset_server);
+            commands.insert_resource(settings_state.clone());
+            
+            spawn_settings_menu(&mut commands, &asset_server, &settings_state);
         }
+    }
+}
+
+/// Handle scrolling with mouse wheel
+fn handle_scrolling(
+    mut mouse_wheel_events: EventReader<MouseWheel>,
+    mut settings_state: ResMut<SettingsMenuState>,
+    content_query: Query<&Node, With<ContentArea>>,
+    viewport_query: Query<&Node, With<ViewportArea>>,
+    mut scrollbar_query: Query<&mut Style, With<ScrollbarHandle>>,
+) {
+    // Process mouse wheel events
+    let scroll_amount = mouse_wheel_events.read().fold(0.0, |acc, event| {
+        match event.unit {
+            MouseScrollUnit::Line => acc - event.y * 20.0, // Adjust the multiplier for faster/slower scrolling
+            MouseScrollUnit::Pixel => acc - event.y,
+        }
+    });
+    
+    if scroll_amount != 0.0 {
+        // Get content and viewport heights if available
+        let content_height = content_query.iter().next()
+            .map(|node| node.size().y)
+            .unwrap_or(1000.0); // Default if not found
+            
+        let viewport_height = viewport_query.iter().next()
+            .map(|node| node.size().y)
+            .unwrap_or(800.0); // Default if not found
+            
+        // Update content height in state
+        settings_state.content_height = content_height;
+        
+        // Calculate max scroll (content height minus viewport height)
+        let max_scroll = (content_height - viewport_height).max(0.0);
+        
+        // Update scroll offset with clamping to prevent over-scrolling
+        settings_state.scroll_offset = (settings_state.scroll_offset + scroll_amount).clamp(0.0, max_scroll);
+        
+        // Update scrollbar handle position
+        if let Some(mut style) = scrollbar_query.iter_mut().next() {
+            // Calculate visible ratio (how much of content is visible)
+            let visible_ratio = (viewport_height / content_height).min(1.0);
+            
+            // Update handle height based on visible ratio
+            style.height = Val::Percent(visible_ratio * 100.0);
+            
+            // Calculate and update handle position
+            if max_scroll > 0.0 {
+                let position_percent = (settings_state.scroll_offset / max_scroll) * (100.0 - visible_ratio * 100.0);
+                style.top = Val::Percent(position_percent);
+            } else {
+                style.top = Val::Percent(0.0);
+            }
+        }
+        
+        println!("Scrolling: {} (offset: {})", scroll_amount, settings_state.scroll_offset);
     }
 }
 
@@ -119,6 +404,7 @@ fn handle_close_settings_event(
 fn spawn_settings_menu(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
+    settings_state: &SettingsMenuState,
 ) {
     // Root node
     commands
@@ -174,40 +460,133 @@ fn spawn_settings_menu(
                         })
                         .with_children(|parent| {
                             // Video tab
-                            create_button(parent, "Video", SettingsButton::VideoTab, asset_server, 150.0, 40.0);
+                            let video_color = if settings_state.active_tab == SettingsTab::Video {
+                                Color::srgb(0.4, 0.4, 0.8) // Active tab color
+                            } else {
+                                Color::srgb(0.15, 0.15, 0.35) // Inactive tab color
+                            };
+                            create_button_with_color(parent, "Video", SettingsButton::VideoTab, asset_server, 150.0, 40.0, video_color);
                             
                             // Audio tab
-                            create_button(parent, "Audio", SettingsButton::AudioTab, asset_server, 150.0, 40.0);
+                            let audio_color = if settings_state.active_tab == SettingsTab::Audio {
+                                Color::srgb(0.4, 0.4, 0.8) // Active tab color
+                            } else {
+                                Color::srgb(0.15, 0.15, 0.35) // Inactive tab color
+                            };
+                            create_button_with_color(parent, "Audio", SettingsButton::AudioTab, asset_server, 150.0, 40.0, audio_color);
                             
                             // Controls tab
-                            create_button(parent, "Controls", SettingsButton::ControlsTab, asset_server, 150.0, 40.0);
+                            let controls_color = if settings_state.active_tab == SettingsTab::Controls {
+                                Color::srgb(0.4, 0.4, 0.8) // Active tab color
+                            } else {
+                                Color::srgb(0.15, 0.15, 0.35) // Inactive tab color
+                            };
+                            create_button_with_color(parent, "Controls", SettingsButton::ControlsTab, asset_server, 150.0, 40.0, controls_color);
                             
                             // Gameplay tab
-                            create_button(parent, "Gameplay", SettingsButton::GameplayTab, asset_server, 150.0, 40.0);
+                            let gameplay_color = if settings_state.active_tab == SettingsTab::Gameplay {
+                                Color::srgb(0.4, 0.4, 0.8) // Active tab color
+                            } else {
+                                Color::srgb(0.15, 0.15, 0.35) // Inactive tab color
+                            };
+                            create_button_with_color(parent, "Gameplay", SettingsButton::GameplayTab, asset_server, 150.0, 40.0, gameplay_color);
                             
                             // Interface tab
-                            create_button(parent, "Interface", SettingsButton::InterfaceTab, asset_server, 150.0, 40.0);
+                            let interface_color = if settings_state.active_tab == SettingsTab::Interface {
+                                Color::srgb(0.4, 0.4, 0.8) // Active tab color
+                            } else {
+                                Color::srgb(0.15, 0.15, 0.35) // Inactive tab color
+                            };
+                            create_button_with_color(parent, "Interface", SettingsButton::InterfaceTab, asset_server, 150.0, 40.0, interface_color);
                         });
                     
                     // Content area
                     parent
                         .spawn(NodeBundle {
                             style: Style {
-                                width: Val::Percent(90.0),
-                                height: Val::Percent(70.0),
-                                flex_direction: FlexDirection::Column,
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::FlexStart,
-                                overflow: Overflow::clip_y(),
+                                width: Val::Percent(80.0),
+                                height: Val::Percent(75.0),
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Stretch,
                                 ..default()
                             },
                             background_color: BackgroundColor(Color::srgb(0.1, 0.1, 0.2)),
                             ..default()
                         })
                         .with_children(|parent| {
-                            // Default to video settings
-                            spawn_video_settings(parent, asset_server);
+                            // Content area with clipping (viewport)
+                            parent.spawn(NodeBundle {
+                                style: Style {
+                                    width: Val::Percent(95.0),
+                                    height: Val::Percent(100.0),
+                                    ..default()
+                                },
+                                ..default()
+                            })
+                            .insert(ViewportArea)
+                            .with_children(|parent| {
+                                // Actual scrollable content
+                                parent.spawn(NodeBundle {
+                                    style: Style {
+                                        width: Val::Percent(100.0),
+                                        min_height: Val::Percent(100.0), // Content might be taller than viewport
+                                        flex_direction: FlexDirection::Column,
+                                        align_items: AlignItems::Stretch,
+                                        justify_content: JustifyContent::FlexStart,
+                                        padding: UiRect::all(Val::Px(15.0)),
+                                        position_type: PositionType::Relative,
+                                        top: Val::Px(-settings_state.scroll_offset), // Apply scroll offset
+                                        ..default()
+                                    },
+                                    ..default()
+                                })
+                                .insert(ContentArea)
+                                .with_children(|parent| {
+                                    // Display the appropriate settings tab based on the active tab
+                                    match settings_state.active_tab {
+                                        SettingsTab::Video => spawn_video_settings(parent, asset_server),
+                                        SettingsTab::Audio => spawn_audio_settings(parent, asset_server, &settings_state.temp_settings),
+                                        SettingsTab::Controls => spawn_controls_settings(parent, asset_server),
+                                        SettingsTab::Gameplay => spawn_gameplay_settings(parent, asset_server),
+                                        SettingsTab::Interface => spawn_interface_settings(parent, asset_server),
+                                    }
+                                });
+                            });
+                            
+                            // Custom scrollbar
+                            parent.spawn(NodeBundle {
+                                style: Style {
+                                    width: Val::Percent(5.0),
+                                    height: Val::Percent(100.0),
+                                    flex_direction: FlexDirection::Column,
+                                    align_items: AlignItems::Center,
+                                    justify_content: JustifyContent::FlexStart,
+                                    padding: UiRect::vertical(Val::Px(5.0)),
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(Color::srgb(0.15, 0.15, 0.25)),
+                                ..default()
+                            })
+                            .with_children(|parent| {
+                                // Scrollbar handle
+                                parent.spawn(NodeBundle {
+                                    style: Style {
+                                        width: Val::Percent(60.0),
+                                        height: Val::Percent(30.0), // Size based on content vs viewport ratio
+                                        position_type: PositionType::Absolute,
+                                        top: Val::Percent(0.0), // Will be updated based on scroll position
+                                        left: Val::Percent(20.0), // Center in the scrollbar track
+                                        ..default()
+                                    },
+                                    background_color: BackgroundColor(Color::srgb(0.4, 0.4, 0.8)),
+                                    ..default()
+                                })
+                                .insert(ScrollbarHandle)
+                                .insert(Interaction::None); // Make it interactive
+                            });
                         });
+                    
+
                     
                     // Bottom buttons
                     parent
@@ -403,61 +782,1469 @@ fn spawn_video_settings(parent: &mut ChildBuilder, asset_server: &Res<AssetServe
                             ..default()
                         },
                         SettingsSlider {
-                            setting_type: SliderType::UiScale,
+                            slider_type: SliderType::UiScale,
                             min: 0.5,
                             max: 2.0,
-                            current: 1.0,
+                            value: 1.0,
+                            dragging: false,
+                            track_entity: Entity::PLACEHOLDER,
+                            fill_entity: Entity::PLACEHOLDER,
+                            handle_entity: Entity::PLACEHOLDER,
+                            value_text_entity: Entity::PLACEHOLDER,
                         },
                     ));
                 });
         });
 }
 
+/// Spawn audio settings content
+fn spawn_audio_settings(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>, settings: &GameSettings) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Auto,
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                justify_content: JustifyContent::FlexStart,
+                padding: UiRect::all(Val::Px(20.0)),
+                row_gap: Val::Px(15.0),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Title
+            parent.spawn(TextBundle::from_section(
+                "Audio Settings",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 24.0,
+                    color: Color::WHITE,
+                },
+            ));
+            
+            // Master Volume
+            create_slider(parent, "Master Volume", 0.0, 1.0, settings.master_volume, SliderType::MasterVolume, asset_server);
+            
+            // Music Volume
+            create_slider(parent, "Music Volume", 0.0, 1.0, settings.music_volume, SliderType::MusicVolume, asset_server);
+            
+            // SFX Volume
+            create_slider(parent, "Sound Effects Volume", 0.0, 1.0, settings.sfx_volume, SliderType::SfxVolume, asset_server);
+            
+            // Voice Volume
+            create_slider(parent, "Voice Volume", 0.0, 1.0, settings.voice_volume, SliderType::VoiceVolume, asset_server);
+            
+            // Ambient Volume
+            create_slider(parent, "Ambient Volume", 0.0, 1.0, settings.ambient_volume, SliderType::AmbientVolume, asset_server);
+            
+            // Divider
+            parent.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(2.0),
+                    margin: UiRect::vertical(Val::Px(10.0)),
+                    ..default()
+                },
+                background_color: BackgroundColor(Color::srgb(0.3, 0.3, 0.5)),
+                ..default()
+            });
+            
+                        // Toggle for audio indicators
+            create_checkbox(parent, "Show Audio Level Indicators", true, CheckboxType::ShowAudioIndicators, asset_server);
+            
+            // SFX Volume Control
+            parent.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(40.0),
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                ..default()
+            })
+            .with_children(|parent| {
+                    // Label
+                    parent.spawn(TextBundle::from_section(
+                        "SFX Volume",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+                    
+                    // Slider
+                    parent
+                        .spawn(NodeBundle {
+                            style: Style {
+                                width: Val::Percent(60.0),
+                                height: Val::Px(20.0),
+                                margin: UiRect::left(Val::Px(20.0)),
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                            ..default()
+                        })
+                        .with_children(|parent| {
+                            parent.spawn((NodeBundle {
+                                style: Style {
+                                    width: Val::Percent(80.0),
+                                    height: Val::Percent(100.0),
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(Color::srgb(0.4, 0.4, 0.8)),
+                                ..default()
+                            },
+                            SettingsSlider {
+                                slider_type: SliderType::SfxVolume,
+                                min: 0.0,
+                                max: 1.0,
+                                value: 0.8,
+                                dragging: false,
+                                track_entity: Entity::PLACEHOLDER,
+                                fill_entity: Entity::PLACEHOLDER,
+                                handle_entity: Entity::PLACEHOLDER,
+                                value_text_entity: Entity::PLACEHOLDER,
+                            },
+                            ));
+                        });
+                });
+            
+            // Voice Volume
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(40.0),
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Label
+                    parent.spawn(TextBundle::from_section(
+                        "Voice Volume",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+                    
+                    // Slider
+                    parent
+                        .spawn(NodeBundle {
+                            style: Style {
+                                width: Val::Percent(60.0),
+                                height: Val::Px(20.0),
+                                margin: UiRect::left(Val::Px(20.0)),
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                            ..default()
+                        })
+                        .with_children(|parent| {
+                            parent.spawn((NodeBundle {
+                                style: Style {
+                                    width: Val::Percent(70.0),
+                                    height: Val::Percent(100.0),
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(Color::srgb(0.4, 0.4, 0.8)),
+                                ..default()
+                            },
+                            SettingsSlider {
+                                slider_type: SliderType::VoiceVolume,
+                                min: 0.0,
+                                max: 1.0,
+                                value: 0.7,
+                                dragging: false,
+                                track_entity: Entity::PLACEHOLDER,
+                                fill_entity: Entity::PLACEHOLDER,
+                                handle_entity: Entity::PLACEHOLDER,
+                                value_text_entity: Entity::PLACEHOLDER,
+                            },
+                            ));
+                        });
+                });
+            
+            // Ambient Volume
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(40.0),
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Label
+                    parent.spawn(TextBundle::from_section(
+                        "Ambient Volume",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+                    
+                    // Slider
+                    parent
+                        .spawn(NodeBundle {
+                            style: Style {
+                                width: Val::Percent(60.0),
+                                height: Val::Px(20.0),
+                                margin: UiRect::left(Val::Px(20.0)),
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                            ..default()
+                        })
+                        .with_children(|parent| {
+                            parent.spawn((NodeBundle {
+                                style: Style {
+                                    width: Val::Percent(60.0),
+                                    height: Val::Percent(100.0),
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(Color::srgb(0.4, 0.4, 0.8)),
+                                ..default()
+                            },
+                            SettingsSlider {
+                                slider_type: SliderType::AmbientVolume,
+                                min: 0.0,
+                                max: 1.0,
+                                value: 0.6,
+                                dragging: false,
+                                track_entity: Entity::PLACEHOLDER,
+                                fill_entity: Entity::PLACEHOLDER,
+                                handle_entity: Entity::PLACEHOLDER,
+                                value_text_entity: Entity::PLACEHOLDER,
+                            },
+                            ));
+                        });
+                });
+        });
+}
+
+/// Spawn controls settings content
+fn spawn_controls_settings(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Auto,
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                justify_content: JustifyContent::FlexStart,
+                padding: UiRect::all(Val::Px(20.0)),
+                row_gap: Val::Px(15.0),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Title
+            parent.spawn(TextBundle::from_section(
+                "Controls Settings",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 24.0,
+                    color: Color::WHITE,
+                },
+            ));
+
+            // Mouse Sensitivity Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Mouse Sensitivity",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Mouse Sensitivity Slider
+                    create_slider(parent, "Mouse Sensitivity", 0.1, 2.0, 1.0, SliderType::MouseSensitivity, asset_server);
+                });
+
+            // Camera Controls Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Camera Controls",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Camera Speed Slider
+                    create_slider(parent, "Camera Speed", 1.0, 10.0, 5.0, SliderType::GameSpeed, asset_server);
+
+                    // Camera Zoom Speed Slider
+                    create_slider(parent, "Zoom Speed", 1.0, 10.0, 5.0, SliderType::GameSpeed, asset_server);
+                });
+
+            // Key Bindings Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Key Bindings",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Key Bindings List
+                    create_key_binding(parent, "Move Camera Up", "W", asset_server);
+                    create_key_binding(parent, "Move Camera Down", "S", asset_server);
+                    create_key_binding(parent, "Move Camera Left", "A", asset_server);
+                    create_key_binding(parent, "Move Camera Right", "D", asset_server);
+                    create_key_binding(parent, "Zoom In", "Scroll Up", asset_server);
+                    create_key_binding(parent, "Zoom Out", "Scroll Down", asset_server);
+                    create_key_binding(parent, "Select Unit", "Left Click", asset_server);
+                    create_key_binding(parent, "Command Unit", "Right Click", asset_server);
+                    create_key_binding(parent, "Pause Game", "Space", asset_server);
+                    create_key_binding(parent, "Open Menu", "Escape", asset_server);
+                });
+
+            // Quick Commands Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Quick Commands",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Quick Commands List
+                    create_key_binding(parent, "Select All Units", "Ctrl+A", asset_server);
+                    create_key_binding(parent, "Stop Units", "S", asset_server);
+                    create_key_binding(parent, "Attack Move", "A", asset_server);
+                    create_key_binding(parent, "Patrol", "P", asset_server);
+                    create_key_binding(parent, "Hold Position", "H", asset_server);
+                });
+        });
+}
+
+/// Spawn gameplay settings content
+fn spawn_gameplay_settings(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Auto,
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                justify_content: JustifyContent::FlexStart,
+                padding: UiRect::all(Val::Px(20.0)),
+                row_gap: Val::Px(15.0),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Title
+            parent.spawn(TextBundle::from_section(
+                "Gameplay Settings",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 24.0,
+                    color: Color::WHITE,
+                },
+            ));
+
+            // Game Speed Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Game Speed",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Game Speed Slider
+                    create_slider(parent, "Game Speed", 0.5, 2.0, 1.0, SliderType::GameSpeed, asset_server);
+                });
+
+            // Difficulty Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Difficulty",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Difficulty Options
+                    create_radio_options(parent, "Difficulty", &["Easy", "Normal", "Hard", "Expert"], 1, asset_server);
+                });
+
+            // Tutorials Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Tutorials",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Tutorial Options
+                    create_checkbox(parent, "Show Tutorials", true, CheckboxType::ShowTutorials, asset_server);
+                    create_checkbox(parent, "Show Tips", true, CheckboxType::ShowTutorials, asset_server);
+                    create_checkbox(parent, "Show Hints", true, CheckboxType::ShowTutorials, asset_server);
+                });
+
+            // Auto-save Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Auto-save",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Auto-save Options
+                    create_checkbox(parent, "Enable Auto-save", true, CheckboxType::AutoSave, asset_server);
+                    create_dropdown(parent, "Auto-save Interval", &["1 Minute", "5 Minutes", "10 Minutes", "15 Minutes", "30 Minutes"], 1, asset_server);
+                    create_dropdown(parent, "Auto-save Slots", &["3 Slots", "5 Slots", "10 Slots"], 0, asset_server);
+                });
+        });
+}
+
+/// Create a radio button options group
+fn create_radio_options(parent: &mut ChildBuilder, _label: &str, options: &[&str], selected_index: usize, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                row_gap: Val::Px(5.0),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            for (i, option) in options.iter().enumerate() {
+                parent
+                    .spawn(NodeBundle {
+                        style: Style {
+                            width: Val::Percent(100.0),
+                            height: Val::Px(30.0),
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        ..default()
+                    })
+                    .with_children(|parent| {
+                        // Radio button
+                        parent
+                            .spawn(NodeBundle {
+                                style: Style {
+                                    width: Val::Px(20.0),
+                                    height: Val::Px(20.0),
+                                    border: UiRect::all(Val::Px(2.0)),
+                                    margin: UiRect::right(Val::Px(10.0)),
+                                    ..default()
+                                },
+                                border_color: BorderColor(Color::WHITE),
+                                background_color: if i == selected_index {
+                                    BackgroundColor(Color::srgb(0.4, 0.4, 0.8))
+                                } else {
+                                    BackgroundColor(Color::srgb(0.2, 0.2, 0.3))
+                                },
+                                ..default()
+                            });
+
+                        // Option label
+                        parent.spawn(TextBundle::from_section(
+                            *option,
+                            TextStyle {
+                                font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                                font_size: 16.0,
+                                color: Color::WHITE,
+                            },
+                        ));
+                    });
+            }
+        });
+}
+
+/// Create a simple checkbox option without checkbox type tracking
+fn create_simple_checkbox(parent: &mut ChildBuilder, label: &str, checked: bool, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Px(30.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Checkbox
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Px(20.0),
+                        height: Val::Px(20.0),
+                        border: UiRect::all(Val::Px(2.0)),
+                        margin: UiRect::right(Val::Px(10.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    border_color: BorderColor(Color::WHITE),
+                    background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.3)),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    if checked {
+                        parent.spawn(NodeBundle {
+                            style: Style {
+                                width: Val::Px(12.0),
+                                height: Val::Px(12.0),
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.4, 0.4, 0.8)),
+                            ..default()
+                        });
+                    }
+                });
+
+            // Label
+            parent.spawn(TextBundle::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                    font_size: 16.0,
+                    color: Color::WHITE,
+                },
+            ));
+        });
+}
+
+/// Spawn interface settings content
+fn spawn_interface_settings(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Auto,
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                justify_content: JustifyContent::FlexStart,
+                padding: UiRect::all(Val::Px(20.0)),
+                row_gap: Val::Px(15.0),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Title
+            parent.spawn(TextBundle::from_section(
+                "Interface Settings",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 24.0,
+                    color: Color::WHITE,
+                },
+            ));
+
+            // HUD Layout Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "HUD Layout",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // HUD Layout Options
+                    create_dropdown(parent, "HUD Layout", &["Standard", "Compact", "Expanded", "Minimal"], 0, asset_server);
+                    create_slider(parent, "HUD Scale", 0.5, 1.5, 1.0, SliderType::UiScale, asset_server);
+                    create_checkbox(parent, "Show Unit Portraits", true, CheckboxType::ShowHealthBars, asset_server);
+                    create_checkbox(parent, "Show Resource Bar", true, CheckboxType::ShowHealthBars, asset_server);
+                    create_checkbox(parent, "Show Command Card", true, CheckboxType::ShowHealthBars, asset_server);
+                });
+
+            // Minimap Options Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Minimap Options",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Minimap Options
+                    create_dropdown(parent, "Minimap Size", &["Small", "Medium", "Large"], 1, asset_server);
+                    create_dropdown(parent, "Minimap Position", &["Bottom Left", "Bottom Right", "Top Left", "Top Right"], 1, asset_server);
+                    create_checkbox(parent, "Show Resource Nodes", true, CheckboxType::ShowHealthBars, asset_server);
+                    create_checkbox(parent, "Show Unit Icons", true, CheckboxType::ShowHealthBars, asset_server);
+                    create_checkbox(parent, "Show Terrain", true, CheckboxType::ShowHealthBars, asset_server);
+                });
+
+            // Information Display Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Information Display",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Information Display Options
+                    create_checkbox(parent, "Show Unit Health Bars", true, CheckboxType::ShowHealthBars, asset_server);
+                    create_checkbox(parent, "Show Unit Status Effects", true, CheckboxType::ShowHealthBars, asset_server);
+                    create_checkbox(parent, "Show Damage Numbers", true, CheckboxType::ShowDamageNumbers, asset_server);
+                    create_checkbox(parent, "Show Resource Income", true, CheckboxType::ShowHealthBars, asset_server);
+                    create_dropdown(parent, "Tooltip Detail", &["Basic", "Detailed", "Expert"], 1, asset_server);
+                });
+
+            // Combat Text Section
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexStart,
+                        margin: UiRect::top(Val::Px(15.0)),
+                        row_gap: Val::Px(10.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Section Title
+                    parent.spawn(TextBundle::from_section(
+                        "Combat Text",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Combat Text Options
+                    create_simple_checkbox(parent, "Show Damage Text", true, asset_server);
+                    create_simple_checkbox(parent, "Show Healing Text", true, asset_server);
+                    create_simple_checkbox(parent, "Show Critical Hits", true, asset_server);
+                    create_dropdown(parent, "Text Size", &["Small", "Medium", "Large"], 1, asset_server);
+                    create_slider(parent, "Text Duration", 1.0, 5.0, 2.0, SliderType::TextDuration, asset_server);
+                });
+        });
+}
+
+/// Create a dropdown selector
+fn create_dropdown(parent: &mut ChildBuilder, label: &str, options: &[&str], selected_index: usize, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                row_gap: Val::Px(5.0),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Label
+            parent.spawn(TextBundle::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                    font_size: 16.0,
+                    color: Color::WHITE,
+                },
+            ));
+
+            // Dropdown button
+            parent
+                .spawn(ButtonBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(30.0),
+                        justify_content: JustifyContent::SpaceBetween,
+                        align_items: AlignItems::Center,
+                        padding: UiRect::horizontal(Val::Px(10.0)),
+                        ..default()
+                    },
+                    background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.3)),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Selected option text
+                    parent.spawn(TextBundle::from_section(
+                        options[selected_index],
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                            font_size: 16.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+
+                    // Dropdown arrow
+                    parent.spawn(TextBundle::from_section(
+                        "▼",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                            font_size: 16.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+                });
+        });
+}
+
+/// Create a checkbox option
+fn create_checkbox(parent: &mut ChildBuilder, label: &str, checked: bool, checkbox_type: CheckboxType, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Px(30.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                margin: UiRect::bottom(Val::Px(10.0)),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Label
+            parent.spawn(TextBundle::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                    font_size: 18.0,
+                    color: Color::WHITE,
+                },
+            ));
+            
+            // Checkbox button with background
+            let _checkbox_entity = parent
+                .spawn((ButtonBundle {
+                    style: Style {
+                        width: Val::Px(24.0),
+                        height: Val::Px(24.0),
+                        margin: UiRect::left(Val::Px(15.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    background_color: BackgroundColor(Color::srgb(0.15, 0.15, 0.25)),
+                    border_color: BorderColor(Color::srgb(0.5, 0.5, 0.8)),
+                    ..default()
+                },
+                SettingsCheckbox {
+                    checked,
+                    checkbox_type,
+                }))
+                .id();
+            
+            // Checkbox mark (only visible if checked)
+            if checked {
+                // Add the checkmark directly as a child of the checkbox button
+                parent.spawn(ButtonBundle {
+                    style: Style {
+                        width: Val::Px(24.0),
+                        height: Val::Px(24.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    ..default()
+                }).with_children(|parent| {
+                    parent.spawn(TextBundle::from_section(
+                        "✓",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 18.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+                });
+            }
+        });
+}
+
+/// Create a key binding UI element
+fn create_key_binding(parent: &mut ChildBuilder, action: &str, key: &str, asset_server: &Res<AssetServer>) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Px(30.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            background_color: BackgroundColor(Color::srgb(0.15, 0.15, 0.25)),
+            ..default()
+        })
+        .with_children(|parent| {
+            // Action name
+            parent.spawn(TextBundle::from_section(
+                action,
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                    font_size: 16.0,
+                    color: Color::WHITE,
+                },
+            )).insert(Style {
+                margin: UiRect::left(Val::Px(10.0)),
+                ..default()
+            });
+
+            // Key binding
+            parent
+                .spawn(ButtonBundle {
+                    style: Style {
+                        width: Val::Px(120.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        margin: UiRect::right(Val::Px(10.0)),
+                        ..default()
+                    },
+                    background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.3)),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    parent.spawn(TextBundle::from_section(
+                        key,
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                            font_size: 14.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+                });
+        });
+}
+
+/// Create a button with custom background color
+fn create_button_with_color(
+    parent: &mut ChildBuilder,
+    text: &str,
+    button_type: SettingsButton,
+    asset_server: &Res<AssetServer>,
+    width: f32,
+    height: f32,
+    color: Color,
+) {
+    parent
+        .spawn(ButtonBundle {
+            style: Style {
+                width: Val::Px(width),
+                height: Val::Px(height),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                margin: UiRect::all(Val::Px(5.0)),
+                ..default()
+            },
+            background_color: BackgroundColor(color),
+            ..default()
+        })
+        .insert(button_type)
+        .with_children(|parent| {
+            parent.spawn(TextBundle::from_section(
+                text,
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 16.0,
+                    color: Color::WHITE,
+                },
+            ));
+        });
+}
+
+/// Create a slider UI element
+fn create_slider(parent: &mut ChildBuilder, label: &str, min: f32, max: f32, default_value: f32, slider_type: SliderType, asset_server: &Res<AssetServer>) {
+    let value_percentage = (default_value - min) / (max - min);
+    let slider_width = 300.0;
+    let handle_position = value_percentage * slider_width;
+    
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                row_gap: Val::Px(5.0),
+                margin: UiRect::bottom(Val::Px(10.0)),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Label and value container
+            let mut label_value_container = parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::SpaceBetween,
+                        ..default()
+                    },
+                    ..default()
+                });
+                
+            // Create the label in the container
+            label_value_container.with_children(|parent| {
+                parent.spawn(TextBundle::from_section(
+                    label,
+                    TextStyle {
+                        font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                        font_size: 16.0,
+                        color: Color::WHITE,
+                    },
+                ));
+            });
+                
+            // Create a variable to store the entity ID
+            let mut value_text_entity = Entity::PLACEHOLDER;
+            
+            // Create the value text and capture its entity ID
+            label_value_container.with_children(|parent| {
+                value_text_entity = parent.spawn(TextBundle::from_section(
+                    format!("{:.1}", default_value),
+                    TextStyle {
+                        font: asset_server.load("fonts/FiraSans-Regular.ttf"),
+                        font_size: 16.0,
+                        color: Color::WHITE,
+                    },
+                )).id();
+            });
+            
+            // Slider track and handle
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Px(slider_width),
+                        height: Val::Px(20.0),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        margin: UiRect::top(Val::Px(5.0)),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Slider track
+                    let track_entity = parent
+                        .spawn((NodeBundle {
+                            style: Style {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(8.0),
+                                position_type: PositionType::Relative,
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.2, 0.2, 0.3)),
+                            ..default()
+                        },
+                        Interaction::default()))
+                        .id();
+                    
+                    // Filled part of the track
+                    let fill_entity = parent.spawn(NodeBundle {
+                        style: Style {
+                            width: Val::Percent(value_percentage * 100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        background_color: BackgroundColor(Color::srgb(0.4, 0.4, 0.8)),
+                        ..default()
+                    }).id();
+                    
+                    // Note: In Bevy, we can't add child entities directly from a ChildBuilder
+                    // We'll need to handle this hierarchy differently
+                    
+                    // Slider handle
+                    let _handle_entity = parent.spawn((NodeBundle {
+                        style: Style {
+                            width: Val::Px(16.0),
+                            height: Val::Px(16.0),
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(handle_position - 8.0), // Center the handle on the position
+                            ..default()
+                        },
+                        background_color: BackgroundColor(Color::srgb(0.8, 0.8, 0.9)),
+                        border_color: BorderColor(Color::srgb(0.4, 0.4, 0.8)),
+                        ..default()
+                    },
+                    SettingsSlider {
+                        min,
+                        max,
+                        value: default_value,
+                        slider_type,
+                        dragging: false,
+                        track_entity,
+                        fill_entity,
+                        handle_entity: Entity::PLACEHOLDER, // Will be updated after spawning
+                        value_text_entity: value_text_entity, // Using the entity directly from parent scope
+                    },
+                    Interaction::default())).id();
+                    
+                    // Note: In Bevy, we can't modify entities with a ChildBuilder directly
+                    // Instead, we'll create it with all the necessary components at once
+                });
+        });
+}
+
+/// Handle slider interaction (dragging to change values)
+fn handle_slider_interaction(
+    mut slider_query: Query<(
+        &Interaction,
+        &mut SettingsSlider,
+        &Node,
+        &GlobalTransform,
+        &mut BackgroundColor,
+    ), (With<SettingsSlider>, Changed<Interaction>)>,
+    mut style_queries: ParamSet<(
+        Query<&mut Style>,
+        Query<&mut Style, With<SettingsSlider>>,
+    )>,
+    mut text_query: Query<&mut Text>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    mut settings_state: ResMut<SettingsMenuState>,
+) {
+    // Get the primary window for mouse position
+    let window = windows.get_single().unwrap();
+    let cursor_position = if let Some(pos) = window.cursor_position() { pos } else { return };
+    
+    for (interaction, mut slider, node, transform, mut background_color) in slider_query.iter_mut() {
+        // Handle interaction state
+        match *interaction {
+            Interaction::Pressed => {
+                slider.dragging = true;
+                *background_color = BackgroundColor(Color::srgb(1.0, 1.0, 1.0));
+            }
+            Interaction::Hovered => {
+                *background_color = BackgroundColor(Color::srgb(0.9, 0.9, 1.0));
+            }
+            Interaction::None => {
+                *background_color = BackgroundColor(Color::srgb(0.8, 0.8, 0.9));
+            }
+        }
+        
+        // Handle dragging and value updates
+        if slider.dragging {
+            if !mouse_buttons.pressed(MouseButton::Left) {
+                slider.dragging = false;
+                continue;
+            }
+            
+            // Calculate new slider value
+            let track_pos = transform.translation();
+            let track_width = node.size().x;
+            let relative_x = (cursor_position.x - track_pos.x).clamp(0.0, track_width);
+            let percentage = relative_x / track_width;
+            slider.value = slider.min + percentage * (slider.max - slider.min);
+            
+            // Update the slider visuals using separate queries to avoid conflicts
+            if let Ok(mut handle_style) = style_queries.p0().get_mut(slider.handle_entity) {
+                handle_style.left = Val::Px(relative_x - 8.0);
+            }
+            
+            if let Ok(mut fill_style) = style_queries.p0().get_mut(slider.fill_entity) {
+                fill_style.width = Val::Px(relative_x);
+            }
+            
+            if let Ok(mut text) = text_query.get_mut(slider.value_text_entity) {
+                text.sections[0].value = format!("{:.0}%", (slider.value * 100.0) as i32);
+            }
+            
+            // Update settings based on slider type
+            match slider.slider_type {
+                SliderType::MasterVolume => settings_state.temp_settings.master_volume = slider.value,
+                SliderType::MusicVolume => settings_state.temp_settings.music_volume = slider.value,
+                SliderType::SfxVolume => settings_state.temp_settings.sfx_volume = slider.value,
+                SliderType::VoiceVolume => settings_state.temp_settings.voice_volume = slider.value,
+                SliderType::AmbientVolume => settings_state.temp_settings.ambient_volume = slider.value,
+                SliderType::MouseSensitivity => settings_state.temp_settings.mouse_sensitivity = slider.value,
+                SliderType::GameSpeed => settings_state.temp_settings.game_speed = slider.value,
+                SliderType::UiScale => settings_state.temp_settings.ui_scale = slider.value,
+                SliderType::MinimapSize => settings_state.temp_settings.minimap_size = slider.value,
+                SliderType::HudOpacity => settings_state.temp_settings.hud_opacity = slider.value,
+                SliderType::TextDuration => {
+                    // Handle text duration specific logic if needed
+                    if let Ok(mut text) = text_query.get_mut(slider.value_text_entity) {
+                        text.sections[0].value = format!("{:.1}", slider.value);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Handle key binding interaction (pressing keys to rebind controls)
+fn handle_key_binding(
+    mut key_binding_query: Query<(&mut KeyBindingElement, &Interaction, Entity), (Changed<Interaction>, With<Interaction>)>,
+    mut text_query: Query<&mut Text>,
+    children_query: Query<&Children>,
+    mut keyboard_input: EventReader<KeyboardInput>,
+    mut settings_state: ResMut<SettingsMenuState>,
+) {
+    // Handle interaction state changes for key binding elements
+    for (mut key_binding, interaction, entity) in key_binding_query.iter_mut() {
+        if *interaction == Interaction::Pressed && !key_binding.listening {
+            // Set this binding to listening mode
+            key_binding.listening = true;
+            
+            // Update text to show "Press any key..."
+            if let Ok(children) = children_query.get(entity) {
+                if let Some(&text_entity) = children.iter().find(|&&child| {
+                    text_query.contains(child)
+                }) {
+                    if let Ok(mut text) = text_query.get_mut(text_entity) {
+                        text.sections[0].value = "Press any key...".to_string();
+                    }
+                }
+            }
+        }
+    }
+    
+    // Handle keyboard input for any listening key binding elements
+    for event in keyboard_input.read() {
+        if event.state == ButtonState::Pressed {
+            // Use the key_code directly as it's already a KeyCode
+            let key = event.key_code;
+            for (mut key_binding, _, entity) in key_binding_query.iter_mut().filter(|(kb, _, _)| kb.listening) {
+                // Update the key binding in settings
+                match key_binding.binding_type {
+                    KeyBindingType::MoveUp => settings_state.temp_settings.key_bindings.move_up = key,
+                    KeyBindingType::MoveDown => settings_state.temp_settings.key_bindings.move_down = key,
+                    KeyBindingType::MoveLeft => settings_state.temp_settings.key_bindings.move_left = key,
+                    KeyBindingType::MoveRight => settings_state.temp_settings.key_bindings.move_right = key,
+                    KeyBindingType::Select => settings_state.temp_settings.key_bindings.select = key,
+                    KeyBindingType::Cancel => settings_state.temp_settings.key_bindings.cancel = key,
+                    KeyBindingType::Pause => settings_state.temp_settings.key_bindings.pause = key,
+                    KeyBindingType::QuickSave => settings_state.temp_settings.key_bindings.quick_save = key,
+                    KeyBindingType::QuickLoad => settings_state.temp_settings.key_bindings.quick_load = key,
+                }
+                
+                // Update the displayed text
+                if let Ok(children) = children_query.get(entity) {
+                    if let Some(&text_entity) = children.iter().find(|&&child| {
+                        text_query.contains(child)
+                    }) {
+                        if let Ok(mut text) = text_query.get_mut(text_entity) {
+                            text.sections[0].value = format!("{:?}", key);
+                        }
+                    }
+                }
+                
+                // Exit listening mode
+                key_binding.listening = false;
+            }
+        }
+    }
+}
+
+/// Handle checkbox interaction (toggling options)
+fn handle_checkbox_interaction(
+    mut checkbox_query: Query<(&mut SettingsCheckbox, &Interaction, &Children), (Changed<Interaction>, With<Interaction>)>,
+    mut background_query: Query<&mut BackgroundColor>,
+    mut settings_state: ResMut<SettingsMenuState>,
+) {
+    for (mut checkbox, interaction, children) in checkbox_query.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            // Toggle the checkbox state
+            checkbox.checked = !checkbox.checked;
+            
+            // Update the checkbox visual appearance
+            if let Some(&child) = children.iter().next() {
+                if let Ok(mut background) = background_query.get_mut(child) {
+                    if checkbox.checked {
+                        *background = BackgroundColor(Color::srgb(0.4, 0.4, 0.8));
+                    } else {
+                        *background = BackgroundColor(Color::srgb(0.2, 0.2, 0.3));
+                    }
+                }
+            }
+            
+            // Update settings based on checkbox type
+            match checkbox.checkbox_type {
+                CheckboxType::Fullscreen => settings_state.temp_settings.fullscreen = checkbox.checked,
+                CheckboxType::VSync => settings_state.temp_settings.vsync = checkbox.checked,
+                CheckboxType::InvertYAxis => settings_state.temp_settings.invert_y_axis = checkbox.checked,
+                CheckboxType::ShowTutorials => settings_state.temp_settings.show_tutorials = checkbox.checked,
+                CheckboxType::AutoSave => settings_state.temp_settings.auto_save = checkbox.checked,
+                CheckboxType::ShowHealthBars => settings_state.temp_settings.show_health_bars = checkbox.checked,
+                CheckboxType::ShowDamageNumbers => settings_state.temp_settings.show_damage_numbers = checkbox.checked,
+                CheckboxType::ShowAudioIndicators => settings_state.temp_settings.show_audio_indicators = checkbox.checked,
+            }
+        }
+    }
+}
+
 /// Handle settings menu button interactions
 fn handle_settings_buttons(
+    mut commands: Commands,
     mut button_query: Query<
         (&Interaction, &SettingsButton, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>),
     >,
     mut ev_close_settings: EventWriter<CloseSettingsEvent>,
     mut settings_state: ResMut<SettingsMenuState>,
+    asset_server: Res<AssetServer>,
+    settings_ui_query: Query<Entity, With<SettingsMenuUI>>,
 ) {
     for (interaction, button_type, mut background_color) in button_query.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
+                let mut tab_changed = false;
+                
                 match button_type {
                     SettingsButton::VideoTab => {
-                        settings_state.active_tab = SettingsTab::Video;
+                        if settings_state.active_tab != SettingsTab::Video {
+                            settings_state.active_tab = SettingsTab::Video;
+                            tab_changed = true;
+                        }
                         println!("Video tab selected");
                     }
                     SettingsButton::AudioTab => {
-                        settings_state.active_tab = SettingsTab::Audio;
+                        if settings_state.active_tab != SettingsTab::Audio {
+                            settings_state.active_tab = SettingsTab::Audio;
+                            tab_changed = true;
+                        }
                         println!("Audio tab selected");
                     }
                     SettingsButton::ControlsTab => {
-                        settings_state.active_tab = SettingsTab::Controls;
+                        if settings_state.active_tab != SettingsTab::Controls {
+                            settings_state.active_tab = SettingsTab::Controls;
+                            tab_changed = true;
+                        }
                         println!("Controls tab selected");
                     }
                     SettingsButton::GameplayTab => {
-                        settings_state.active_tab = SettingsTab::Gameplay;
+                        if settings_state.active_tab != SettingsTab::Gameplay {
+                            settings_state.active_tab = SettingsTab::Gameplay;
+                            tab_changed = true;
+                        }
                         println!("Gameplay tab selected");
                     }
                     SettingsButton::InterfaceTab => {
-                        settings_state.active_tab = SettingsTab::Interface;
+                        if settings_state.active_tab != SettingsTab::Interface {
+                            settings_state.active_tab = SettingsTab::Interface;
+                            tab_changed = true;
+                        }
                         println!("Interface tab selected");
                     }
+
                     SettingsButton::Apply => {
                         println!("Apply settings");
-                        // Apply settings logic would go here
+                        // Apply the temporary settings to the actual game settings
+                        commands.insert_resource(settings_state.temp_settings.clone());
+                        println!("Settings applied: {:?}", settings_state.temp_settings);
+                        // Close the settings menu
+                        ev_close_settings.send(CloseSettingsEvent);
                     }
                     SettingsButton::Reset => {
                         println!("Reset settings");
-                        // Reset settings logic would go here
+                        // In Bevy, we can't access the world directly from Commands
+                        // We should inject the resource we need as a system parameter
+                        // For now, we'll just use default settings
+                        let game_settings = GameSettings::default();
+                        
+                        // Reset the temporary settings to the current game settings
+                        settings_state.temp_settings = game_settings;
+                        
+                        // Rebuild the menu to reflect the reset values
+                        tab_changed = true;
                     }
                     SettingsButton::Back => {
                         println!("Back to main menu");
                         ev_close_settings.send(CloseSettingsEvent);
                     }
+                }
+                
+                // If the tab changed, rebuild the settings menu
+                if tab_changed {
+                    // Remove the old settings menu
+                    for entity in settings_ui_query.iter() {
+                        commands.entity(entity).despawn_recursive();
+                    }
+                    
+                    // Spawn a new settings menu with the updated tab
+                    let state = settings_state.clone();
+                    spawn_settings_menu(&mut commands, &asset_server, &state);
                 }
             }
             Interaction::Hovered => {

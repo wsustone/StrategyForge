@@ -160,8 +160,8 @@ impl BaseModule {
         Self {
             module_type: ModuleType::Movement {
                 speed_modifier: speed_mod,
-                efficiency: efficiency,
-                terrain_penalty_reduction: terrain_penalty_reduction,
+                efficiency,
+                terrain_penalty_reduction,
             },
             health: 100.0,
             max_health: 100.0,

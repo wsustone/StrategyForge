@@ -23,21 +23,6 @@ pub struct GameCamera {
     pub max_zoom: f32,
 }
 
-fn setup_camera(mut commands: Commands) {
-    commands.spawn((
-        Camera2dBundle {
-            transform: Transform::from_xyz(0.0, 0.0, 1000.0),
-            ..default()
-        },
-        GameCamera {
-            speed: 500.0,
-            zoom_speed: 1.5,
-            min_zoom: 0.5,
-            max_zoom: 3.0,
-        },
-    ));
-}
-
 fn camera_movement(
     time: Res<Time>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
