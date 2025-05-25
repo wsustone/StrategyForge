@@ -27,6 +27,7 @@ use crate::systems::{
     ProductionPlugin,
     BaseInitializationPlugin,
     CameraPlugin,
+    CameraManagerPlugin,
 };
 
 // Component plugins
@@ -34,6 +35,7 @@ use crate::components::{
     AIPlugin,
     base_modules::BaseModulePlugin,
     strategic::StrategicLocationPlugin,
+    IsometricSpritePlugin,
 };
 
 // UI plugins
@@ -41,6 +43,7 @@ use crate::ui::{
     BaseActionUIPlugin,
     BuildingProductionUIPlugin,
     BuildingSelectionUIPlugin,
+    menu::MenuPlugin,
 };
 
 // Resource plugins
@@ -51,12 +54,7 @@ use crate::resources::{
 
 // Other plugins
 use crate::debug::DebugPlugin;
-use crate::entities::*;
-use crate::resources::*;
-use crate::states::*;
-use crate::systems::*;
-use crate::ui::*;
-use crate::ui::menu::MenuPlugin;
+use crate::entities::MobileBasePlugin;
 use crate::units::EngineerPlugin;
 use crate::sprites::SpriteLoaderPlugin;
 
@@ -65,11 +63,10 @@ use crate::components::{
     base_modules::{BaseModule, ModuleType, ResourceType, DamageType, UtilityEffect},
     player::MechanicalBase,
 };
+
 // Temporarily commented out for debugging
 // use crate::utils::FontPlugin;
 // use crate::components::UnitLabelPlugin;
-
-// Using GameState from the states module
 
 fn main() {
     App::new()
@@ -87,14 +84,15 @@ fn main() {
         // Add game state management
         .init_state::<states::game_state::GameState>()
         
-        // Add our custom plugins individually
+        // Add our custom plugins
         // Game state management
         .add_plugins(LoadingPlugin)
         .add_plugins(MainMenuPlugin)
         .add_plugins(GameplayPlugin)
         .add_plugins(GameOverPlugin)
         
-        // Core systems
+        // Core systems - Add CameraManagerPlugin before CameraPlugin
+        .add_plugins(CameraManagerPlugin) // Add this first to manage cameras
         .add_plugins(CameraPlugin)
         .add_plugins(MapPlugin)
         .add_plugins(MovementPlugin)
@@ -111,6 +109,7 @@ fn main() {
         
         // Unit systems
         .add_plugins(EngineerPlugin)
+        .add_plugins(MobileBasePlugin)
         
         // UI systems
         .add_plugins(BaseActionUIPlugin)
@@ -121,6 +120,7 @@ fn main() {
         // Debug and utility
         .add_plugins(DebugPlugin)
         .add_plugins(SpriteLoaderPlugin)
+        .add_plugins(IsometricSpritePlugin)
         
         // Register components for save/load (must be after all types are defined)
         .register_type::<MechanicalBase>()
@@ -129,6 +129,7 @@ fn main() {
         .register_type::<ResourceType>()
         .register_type::<DamageType>()
         .register_type::<UtilityEffect>()
+        
         // Temporarily disable new plugins for debugging
         // .add_plugins(FontPlugin)
         // .add_plugins(UnitLabelPlugin)

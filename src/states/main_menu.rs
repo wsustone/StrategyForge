@@ -3,6 +3,7 @@ use bevy::app::AppExit;
 use crate::states::game_state::GameState;
 use crate::ui::menu::{OpenSettingsEvent, OpenFactionMenuEvent};
 use crate::utils::font_loader::get_font_handle;
+use crate::systems::camera_manager::spawn_camera_for_state;
 
 pub struct MainMenuPlugin;
 
@@ -34,8 +35,8 @@ fn setup_main_menu(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    // Set up camera
-    commands.spawn(Camera2dBundle::default());
+    // Set up camera with state management
+    spawn_camera_for_state(&mut commands, GameState::MainMenu);
     
     // Root node
     commands

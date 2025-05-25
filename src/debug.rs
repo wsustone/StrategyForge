@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::components::player::MechanicalBase;
 use crate::components::unit::{Unit, Selected};
-use crate::GameState;
+use crate::states::game_state::GameState;
 
 pub struct DebugPlugin;
 

@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use super::components::{MenuUI, create_button, create_panel, create_title};
+use super::components::{MenuUI, create_button, create_title};
 
 /// Plugin for the faction headquarters menu
 pub struct FactionMenuPlugin;
@@ -58,50 +58,50 @@ fn get_faction_info(faction_type: FactionType) -> FactionInfo {
             name: "Mechanists",
             description: "Industrial powerhouse focused on heavy machinery, defensive capabilities, and raw firepower.",
             strengths: ["Heavy Weaponry", "Defensive Structures", "Resource Efficiency"],
-            primary_color: Color::rgb(0.6, 0.2, 0.2),
-            secondary_color: Color::rgb(0.3, 0.3, 0.3),
+            primary_color: Color::srgb(0.6, 0.2, 0.2),
+            secondary_color: Color::srgb(0.3, 0.3, 0.3),
         },
         FactionType::Synthetics => FactionInfo {
             name: "Synthetics",
             description: "Advanced AI civilization utilizing energy weapons, computational systems, and adaptive technology.",
             strengths: ["Energy Weapons", "Computational Systems", "Adaptive Technology"],
-            primary_color: Color::rgb(0.2, 0.6, 0.8),
-            secondary_color: Color::rgb(0.1, 0.2, 0.4),
+            primary_color: Color::srgb(0.2, 0.6, 0.8),
+            secondary_color: Color::srgb(0.1, 0.2, 0.4),
         },
         FactionType::Nomads => FactionInfo {
             name: "Nomads",
             description: "Desert wanderers with exceptional mobility, scavenging abilities, and survival expertise.",
             strengths: ["Mobility", "Scavenging", "Adaptability"],
-            primary_color: Color::rgb(0.8, 0.6, 0.2),
-            secondary_color: Color::rgb(0.5, 0.3, 0.1),
+            primary_color: Color::srgb(0.8, 0.6, 0.2),
+            secondary_color: Color::srgb(0.5, 0.3, 0.1),
         },
         FactionType::ArcaneEngineers => FactionInfo {
             name: "Arcane Engineers",
             description: "Masters of crystal technology and energy field manipulation with unique power systems.",
             strengths: ["Crystal Technology", "Energy Fields", "Power Generation"],
-            primary_color: Color::rgb(0.5, 0.2, 0.7),
-            secondary_color: Color::rgb(0.2, 0.1, 0.3),
+            primary_color: Color::srgb(0.5, 0.2, 0.7),
+            secondary_color: Color::srgb(0.2, 0.1, 0.3),
         },
         FactionType::CorporateMercenaries => FactionInfo {
             name: "Corporate Mercenaries",
             description: "Profit-driven specialists with modular technology, economic advantages, and tactical flexibility.",
             strengths: ["Modular Systems", "Economic Bonuses", "Tactical Flexibility"],
-            primary_color: Color::rgb(0.2, 0.4, 0.2),
-            secondary_color: Color::rgb(0.1, 0.2, 0.1),
+            primary_color: Color::srgb(0.2, 0.4, 0.2),
+            secondary_color: Color::srgb(0.1, 0.2, 0.1),
         },
         FactionType::VoidHarbingers => FactionInfo {
             name: "Void Harbingers",
             description: "Mysterious manipulators of gravity and dark energy with unique spatial control abilities.",
             strengths: ["Gravity Manipulation", "Dark Energy", "Spatial Control"],
-            primary_color: Color::rgb(0.1, 0.1, 0.3),
-            secondary_color: Color::rgb(0.05, 0.05, 0.15),
+            primary_color: Color::srgb(0.1, 0.1, 0.3),
+            secondary_color: Color::srgb(0.05, 0.05, 0.15),
         },
         FactionType::SwarmCollective => FactionInfo {
             name: "Swarm Collective",
             description: "Hive-mind entities with distributed intelligence, rapid reproduction, and overwhelming numbers.",
             strengths: ["Overwhelming Numbers", "Rapid Reproduction", "Distributed Intelligence"],
-            primary_color: Color::rgb(0.7, 0.3, 0.0),
-            secondary_color: Color::rgb(0.4, 0.2, 0.0),
+            primary_color: Color::srgb(0.7, 0.3, 0.0),
+            secondary_color: Color::srgb(0.4, 0.2, 0.0),
         },
     }
 }
@@ -145,7 +145,7 @@ fn create_faction_card(
 ) {
     let faction_info = get_faction_info(faction_type);
     let border_color = if is_selected {
-        Color::rgb(0.9, 0.8, 0.1) // Gold border for selected faction
+        Color::srgb(0.9, 0.8, 0.1) // Gold border for selected faction
     } else {
         faction_info.secondary_color
     };
@@ -468,15 +468,15 @@ fn handle_close_faction_menu_event(
 
 /// Handle faction menu button interactions
 fn handle_faction_menu_buttons(
-    mut commands: Commands,
+    _commands: Commands,
     mut button_query: Query<
         (&Interaction, &FactionMenuButton, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>),
     >,
     mut faction_state: ResMut<FactionMenuState>,
     mut ev_close_faction: EventWriter<CloseFactionMenuEvent>,
-    asset_server: Res<AssetServer>,
-    faction_cards_query: Query<Entity, With<FactionMenuUI>>,
+    _asset_server: Res<AssetServer>,
+    _faction_cards_query: Query<Entity, With<FactionMenuUI>>,
 ) {
     let all_factions = get_all_faction_types();
     let total_factions = all_factions.len();

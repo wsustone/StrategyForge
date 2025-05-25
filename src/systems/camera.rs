@@ -6,8 +6,9 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Gameplay), setup_camera)
-           .add_systems(
+        // Remove the setup_camera system to avoid spawning duplicate cameras
+        // The CameraManagerPlugin will handle camera creation for all states
+        app.add_systems(
                 Update, 
                 camera_movement.run_if(in_state(GameState::Gameplay))
             );
@@ -40,7 +41,7 @@ fn setup_camera(mut commands: Commands) {
 fn camera_movement(
     time: Res<Time>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut Transform, &GameCamera), With<Camera>>,
+    mut query: Query<(&mut Transform, &GameCamera), (With<Camera>, With<crate::systems::camera_manager::StateCamera>)>,
     mut mouse_wheel_events: EventReader<MouseWheel>,
 ) {
     let (mut transform, camera) = query.single_mut();

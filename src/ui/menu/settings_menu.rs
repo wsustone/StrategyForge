@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-use crate::states::game_state::GameState;
-use super::components::{MenuUI, create_button, create_panel, create_title};
+use super::components::{MenuUI, create_button, create_title};
 
 /// Plugin for the settings menu
 pub struct SettingsMenuPlugin;

@@ -35,8 +35,7 @@ fn setup_main_menu(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    // Set up camera
-    commands.spawn(Camera2dBundle::default());
+    // Camera is now managed by the CameraManagerPlugin
     
     // Root node
     commands
@@ -189,15 +188,11 @@ fn handle_main_menu_buttons(
 fn cleanup_main_menu(
     mut commands: Commands,
     query: Query<Entity, With<MainMenuUI>>,
-    camera_query: Query<Entity, With<Camera2d>>,
 ) {
     // Remove main menu UI
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
     }
     
-    // Remove camera
-    for entity in camera_query.iter() {
-        commands.entity(entity).despawn_recursive();
-    }
+    // Camera cleanup is now handled by the CameraManagerPlugin
 }

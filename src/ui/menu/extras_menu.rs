@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use super::components::{MenuUI, create_button, create_panel, create_title};
+use super::components::{MenuUI, create_button, create_title};
 
 /// Plugin for the extras menu
 pub struct ExtrasMenuPlugin;

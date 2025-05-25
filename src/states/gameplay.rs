@@ -6,6 +6,7 @@ use crate::components::unit_types::UnitType;
 use crate::components::base_modules::ResourceType;
 use crate::components::player::{MechanicalBase, PlayerResources};
 use crate::sprites::GameSprites;
+use crate::systems::camera_manager::spawn_camera_for_state;
 
 // TODO: Move UnitType to components/unit.rs or create a proper unit_types module
 
@@ -61,7 +62,8 @@ fn setup_gameplay(
     asset_server: Res<AssetServer>,
     game_sprites: Res<GameSprites>,
 ) {
-    // Game camera (we'll use the one from the CameraPlugin)
+    // Set up camera with state management
+    spawn_camera_for_state(&mut commands, GameState::Gameplay);
     
     // Initialize game resources
     commands.insert_resource(GameResources {

@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use crate::states::game_state::GameState;
+use crate::systems::camera_manager::spawn_camera_for_state;
 use crate::utils::font_loader::get_font_handle;
 
 pub struct LoadingPlugin;
@@ -17,8 +18,8 @@ impl Plugin for LoadingPlugin {
 struct LoadingTimer(Timer);
 
 fn setup_loading(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // Create a simple loading screen
-    commands.spawn(Camera2dBundle::default());
+    // Create a simple loading screen with a managed camera
+    spawn_camera_for_state(&mut commands, GameState::Loading);
     
     commands.spawn((NodeBundle {
         style: Style {

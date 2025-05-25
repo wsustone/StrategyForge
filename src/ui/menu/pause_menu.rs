@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::states::game_state::GameState;
-use super::components::{MenuUI, create_button, create_panel, create_title};
+use super::components::{MenuUI, create_button, create_title};
 
 /// Placeholder for tech tree event until the tech module is fully integrated
 #[derive(Event)]

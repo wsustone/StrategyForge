@@ -27,8 +27,14 @@ pub mod prelude {
         player::PlayerResources,
     };
     
-    pub use crate::resources::*;
-    pub use crate::sprites::*;
+    // Import specific items from resources instead of using glob imports
+    pub use crate::resources::map_data::*;
+    pub use crate::resources::map::*;
+    pub use crate::resources::resource_nodes::ResourceNodePlugin;
+    
+    // Import specific items from sprites
+    pub use crate::sprites::GameSprites;
+    pub use crate::sprites::SpriteLoaderPlugin;
     pub use crate::states::*;
     pub use crate::states::game_state::GameState;
     pub use crate::systems::*;
