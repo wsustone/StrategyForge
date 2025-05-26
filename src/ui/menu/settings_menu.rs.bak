@@ -4,22 +4,10 @@ use bevy::input::keyboard::{KeyCode, KeyboardInput};
 use bevy::input::mouse::{MouseButton, MouseScrollUnit, MouseWheel};
 use bevy::input::ButtonInput;
 use bevy::input::ButtonState;
+use bevy::window::PrimaryWindow;
 use bevy::ecs::query::With;
 use bevy::ecs::system::Query;
-use bevy::window::WindowMode as DisplayMode;
 use super::components::{MenuUI, create_button, create_title};
-
-/// Component for display mode buttons
-#[derive(Component, Debug, Clone, Copy)]
-struct DisplayModeButton(WindowMode);
-
-/// Component to mark the display mode options container
-#[derive(Component)]
-struct DisplayModeOptions;
-
-/// Event for changing display mode
-#[derive(Event, Debug, Clone, Copy)]
-struct ChangeDisplayMode(pub WindowMode);
 
 /// Plugin for the settings menu
 pub struct SettingsMenuPlugin;
@@ -215,6 +203,18 @@ enum SettingsTab {
 /// Marker component for settings menu UI elements
 #[derive(Component)]
 struct SettingsMenuUI;
+
+/// Component to mark the display mode options container
+#[derive(Component)]
+struct DisplayModeOptions;
+
+/// Component for display mode buttons
+#[derive(Component)]
+struct DisplayModeButton(WindowMode);
+
+/// Event for changing display mode
+#[derive(Event)]
+struct ChangeDisplayMode(WindowMode);
 
 /// Marker for the content area that can be scrolled
 #[derive(Component)]
@@ -725,30 +725,32 @@ fn spawn_video_settings(parent: &mut ChildBuilder, asset_server: &Res<AssetServe
                             Color::srgb(0.2, 0.2, 0.4)
                         };
                         
-                        parent.spawn((
-                            ButtonBundle {
-                                style: Style {
-                                    width: Val::Px(120.0),
-                                    height: Val::Px(36.0),
-                                    margin: UiRect::right(Val::Px(10.0)),
-                                    justify_content: JustifyContent::Center,
-                                    align_items: AlignItems::Center,
+                        parent
+                            .spawn((
+                                ButtonBundle {
+                                    style: Style {
+                                        width: Val::Px(120.0),
+                                        height: Val::Px(36.0),
+                                        margin: UiRect::right(Val::Px(10.0)),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        ..default()
+                                    },
+                                    background_color: BackgroundColor(button_color),
                                     ..default()
                                 },
-                                background_color: BackgroundColor(button_color),
-                                ..default()
-                            },
-                            DisplayModeButton(mode),
-                        )).with_children(|parent| {
-                            parent.spawn(TextBundle::from_section(
-                                label,
-                                TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Medium.ttf"),
-                                    font_size: 18.0,
-                                    color: Color::WHITE,
-                                },
-                            ));
-                        });
+                                DisplayModeButton(mode),
+                            ))
+                            .with_children(|parent| {
+                                parent.spawn(TextBundle::from_section(
+                                    label,
+                                    TextStyle {
+                                        font: asset_server.load("fonts/FiraSans-Medium.ttf"),
+                                        font_size: 18.0,
+                                        color: Color::WHITE,
+                                    },
+                                ));
+                            });
                     }
                 });
             
@@ -2544,43 +2546,6 @@ fn handle_settings_buttons(
             Interaction::None => {
                 *background_color = BackgroundColor(Color::srgb(0.15, 0.15, 0.35));
             }
-        }
-    }
-}
-
-/// System to handle display mode button clicks
-fn handle_display_mode_buttons(
-    mut interaction_query: Query<(&Interaction, &DisplayModeButton, Entity), (Changed<Interaction>, With<Button>)>,
-    mut buttons_query: Query<&mut BackgroundColor>,
-    mut change_mode_events: EventWriter<ChangeDisplayMode>,
-) {
-    for (interaction, display_mode, button_entity) in &mut interaction_query {
-        if *interaction == Interaction::Pressed {
-            // Update all display mode buttons to unselected state
-            for mut bg in &mut buttons_query {
-                bg.0 = Color::srgb(0.2, 0.2, 0.4).into();
-            }
-            
-            // Set the clicked button to selected state
-            if let Ok(mut bg) = buttons_query.get_mut(button_entity) {
-                bg.0 = Color::srgb(0.3, 0.6, 1.0).into();
-            }
-            
-            // Send event to change the display mode
-            change_mode_events.send(ChangeDisplayMode(display_mode.0));
-        }
-    }
-}
-
-/// System to apply display mode changes
-fn apply_display_mode_changes(
-    mut change_mode_events: EventReader<ChangeDisplayMode>,
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
-) {
-    for event in change_mode_events.read() {
-        if let Ok(mut window) = windows.get_single_mut() {
-            window.mode = event.0;
-            println!("Changed display mode to: {:?}", event.0);
         }
     }
 }
